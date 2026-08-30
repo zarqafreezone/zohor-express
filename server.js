@@ -48,6 +48,22 @@ const CATEGORY_ICONS = {
 const SUBSCRIPTION_FEE = 10;   // دينار شهرياً من البقالة
 const ORDER_COMMISSION = 0.2;  // 20 قرش على كل طلب
 const TRIAL_DAYS = 14;         // فترة تجريبية مجانية للمحل الجديد
+const SEED_SHOP_PASSWORD = '1234'; // كلمة المرور الافتراضية للمحلات التجريبية
+
+/* صور حقيقية لكل تصنيف */
+const CATEGORY_IMAGES = {
+  'بقالة': '/img/shops/grocery.jpg',
+  'مطعم': '/img/shops/restaurant.jpg',
+  'لحوم ومجمدات': '/img/shops/butcher.jpg',
+  'خضار وفواكه': '/img/shops/vegetables.jpg',
+  'مخبز': '/img/shops/bakery.jpg',
+  'موبايلات واكسسوارات وبطاقات شحن': '/img/shops/mobile.jpg',
+  'اجهزة كهربائية والكترونيات': '/img/shops/electronics.jpg',
+  'صيانة ومقاولات': '/img/shops/maintenance.jpg',
+  'دراي كلين': '/img/shops/dryclean.jpg',
+  'محلات فلترة المياه': '/img/shops/water.jpg',
+  'أخرى': '/img/shops/spices.jpg',
+};
 
 /* تطبيع رقم الجوال: يقبل 07... أو +9627... أو 009627... أو 9627... */
 function normPhone(raw) {
@@ -318,8 +334,10 @@ function publicShop(s) {
     id: s.id, name: s.name, category: s.category, icon: s.icon, rating: s.rating,
     isOpen: s.isOpen, status: s.status, productCount: s.products.length,
     subscriptionActive: !!(s.subscriptionUntil && s.subscriptionUntil > Date.now()),
+    image: s.image || CATEGORY_IMAGES[s.category] || null,
   };
 }
+const subActive = (s) => !!(s.subscriptionUntil && s.subscriptionUntil > Date.now());
 function findShop(id) { return db.shops.find((s) => s.id === id); }
 function findDriver(id) { return db.drivers.find((d) => d.id === id); }
 function findOrder(id) { return db.orders.find((o) => o.id === id); }
@@ -394,7 +412,10 @@ async function handleApi(req, res, pathname, url) {
 
   } else if (m === 'GET' && pathname === '/api/shops') {
     const all = q('all') === '1';
-    const shops = db.shops.filter((s) => all || s.status === 'active').map(publicShop);
+    // للزبائن: المحلات الفعّالة فقط + اشتراكها ساري (أو فترة تجريبية)
+    const shops = db.shops
+      .filter((s) => all || (s.status === 'active' && subActive(s)))
+      .map(publicShop);
     return json(res, 200, { shops });
 
   } else if (m === 'POST' && pathname === '/api/shops/register') {
@@ -404,6 +425,8 @@ async function handleApi(req, res, pathname, url) {
     if (!validPhone(norm)) return bad(res, 'رقم الجوال غير صحيح — مثال صحيح: 0791234567');
     const exists = db.shops.find((s) => s.phone === norm);
     if (exists) return bad(res, 'يوجد محل مسجل بهذا الرقم مسبقاً — ادخل عليه من القائمة');
+    const password = String(body.password || '');
+    if (password.length < 4) return bad(res, 'الرقم السري مطلوب (4 خانات على الأقل) — ستحتاجه لإدارة محلك');
     const cat = CATEGORIES.includes(category) ? category : 'أخرى';
     const shop = {
       id: nextId('s'), name, owner, phone: norm,
@@ -411,6 +434,7 @@ async function handleApi(req, res, pathname, url) {
       status: 'active', isOpen: true,
       subscriptionUntil: Date.now() + TRIAL_DAYS * 86400000,
       trial: true,
+      password,
       createdAt: Date.now(), products: [],
     };
     db.shops.push(shop);
@@ -419,9 +443,24 @@ async function handleApi(req, res, pathname, url) {
 
   } else if (m === 'POST' && pathname === '/api/shops/login') {
     const shop = findShop(body.shopId);
-    if (!shop) return bad(res, 'البقالة غير موجودة', 404);
-    if (shop.status === 'blocked') return bad(res, 'تم إيقاف هذه البقالة. تواصل مع الإدارة', 403);
+    if (!shop) return bad(res, 'المحل غير موجود', 404);
+    if (shop.status === 'blocked') return bad(res, 'تم إيقاف هذا المحل. تواصل مع الإدارة', 403);
+    const pass = String(body.password || '');
+    if (!pass) return bad(res, 'أدخل الرقم السري للمحل');
+    if (pass !== (shop.password || SEED_SHOP_PASSWORD)) return bad(res, 'الرقم السري غير صحيح', 401);
     return json(res, 200, { shop });
+
+  } else if (m === 'PATCH' && parts[1] === 'shops' && parts[2] && parts[3] === 'password') {
+    // تغيير الرقم السري
+    const shop = findShop(parts[2]);
+    if (!shop) return bad(res, 'المحل غير موجود', 404);
+    const oldPass = String(body.oldPassword || '');
+    const newPass = String(body.newPassword || '');
+    if (oldPass !== (shop.password || SEED_SHOP_PASSWORD)) return bad(res, 'الرقم السري الحالي غير صحيح', 401);
+    if (newPass.length < 4) return bad(res, 'الرقم السري الجديد يجب أن يكون 4 خانات على الأقل');
+    shop.password = newPass;
+    saveDb();
+    return json(res, 200, { ok: true });
 
   } else if (parts[1] === 'shops' && parts[2] && !parts[3]) {
     const shop = findShop(parts[2]);
@@ -477,8 +516,9 @@ async function handleApi(req, res, pathname, url) {
     const { shopId, customer, items, notes } = body;
     const shop = findShop(shopId);
     if (!shop) return bad(res, 'البقالة غير موجودة', 404);
-    if (shop.status !== 'active') return bad(res, 'هذه البقالة غير مفعّلة حالياً');
-    if (!shop.isOpen) return bad(res, 'البقالة مغلقة حالياً، جرّب لاحقاً');
+    if (shop.status !== 'active') return bad(res, 'هذا المحل غير مفعّل حالياً');
+    if (!shop.isOpen) return bad(res, 'المحل مغلق حالياً، جرّب لاحقاً');
+    if (!subActive(shop)) return bad(res, 'انتهى اشتراك هذا المحل — سيعود قريباً');
     if (!customer || !validPhone(normPhone(customer.phone))) return bad(res, 'رقم جوال الزبون غير صحيح');
     if (!customer.address || !String(customer.address).trim()) return bad(res, 'العنوان مطلوب للتوصيل');
     if (!Array.isArray(items) || !items.length) return bad(res, 'السلة فارغة');
@@ -548,7 +588,17 @@ async function handleApi(req, res, pathname, url) {
   } else if (parts[1] === 'orders' && parts[2] && !parts[3]) {
     const order = findOrder(parts[2]);
     if (!order) return bad(res, 'الطلب غير موجود', 404);
-    if (m === 'GET') return json(res, 200, { order });
+    if (m === 'GET') {
+      // إرفاق موقع السائق الحديث إن كان مكلّفاً بالطلب
+      const out = { order };
+      if (order.driverId) {
+        const drv = findDriver(order.driverId);
+        if (drv && drv.location && Date.now() - drv.location.updatedAt < 15 * 60000) {
+          out.driverLocation = drv.location;
+        }
+      }
+      return json(res, 200, out);
+    }
 
     if (m === 'PATCH') {
       const action = body.action;
@@ -600,6 +650,19 @@ async function handleApi(req, res, pathname, url) {
     }
     saveDb();
     return json(res, 200, { driver: d });
+
+  } else if (m === 'PATCH' && parts[1] === 'drivers' && parts[2] && parts[3] === 'location') {
+    // تحديث موقع السائق المباشر (GPS)
+    const driver = findDriver(parts[2]);
+    if (!driver) return bad(res, 'السائق غير موجود', 404);
+    const lat = parseFloat(body.lat), lng = parseFloat(body.lng);
+    if (isNaN(lat) || isNaN(lng)) {
+      driver.location = null;
+    } else {
+      driver.location = { lat: +lat.toFixed(6), lng: +lng.toFixed(6), updatedAt: Date.now() };
+    }
+    saveDb();
+    return json(res, 200, { ok: true });
 
   } else if (parts[1] === 'drivers' && parts[2] && !parts[3]) {
     const driver = findDriver(parts[2]);

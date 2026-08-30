@@ -600,3 +600,61 @@ textarea.input { resize: vertical; min-height: 64px; }
   animation: pulse 1.4s infinite;
 }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); } 70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+
+/* ---------------- صور المحلات الحقيقية ---------------- */
+
+.shops-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .shops-grid { grid-template-columns: 1fr; } }
+
+.shop-card { padding: 0; overflow: hidden; }
+.shop-photo {
+  position: relative;
+  height: 120px;
+  background: var(--v3);
+  display: grid; place-items: center;
+  overflow: hidden;
+}
+.shop-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shop-photo.closed img { filter: grayscale(0.85) brightness(0.75); }
+.shop-photo .ph-emoji { font-size: 44px; }
+.shop-photo .open-flag {
+  position: absolute; bottom: 8px; right: 8px;
+  font-size: 11px; font-weight: 800;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 3px 10px; border-radius: 20px;
+}
+.shop-photo .open-flag.on { color: var(--ok); }
+.shop-photo .open-flag.off { color: var(--bad); }
+.sp-body { padding: 11px 13px 13px; }
+.sp-body h3 { font-size: 15px; margin-bottom: 2px; }
+
+.shop-banner {
+  height: 140px;
+  background-size: cover;
+  background-position: center;
+  border-radius: var(--r);
+  margin-bottom: 12px;
+  box-shadow: var(--sh);
+  position: relative;
+}
+.shop-banner::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: var(--r);
+  box-shadow: inset 0 -40px 40px -20px rgba(34, 28, 53, 0.35);
+}
+
+.map-box {
+  height: 230px;
+  border-radius: 13px;
+  overflow: hidden;
+  background: var(--v3);
+  border: 1px solid var(--line);
+}
+
+/* الهيرو بخلفية جبل الزهور (شفافة عبر التدرج) */
+.hero {
+  background-color: #4c1d95;
+  background-size: cover;
+  background-position: center bottom;
+}

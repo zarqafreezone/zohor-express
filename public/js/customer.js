@@ -3,6 +3,15 @@
    ============================================================ */
 'use strict';
 
+const CAT_IMG = {
+  'بقالة': '/img/shops/grocery.jpg', 'مطعم': '/img/shops/restaurant.jpg',
+  'لحوم ومجمدات': '/img/shops/butcher.jpg', 'خضار وفواكه': '/img/shops/vegetables.jpg',
+  'مخبز': '/img/shops/bakery.jpg', 'موبايلات واكسسوارات وبطاقات شحن': '/img/shops/mobile.jpg',
+  'اجهزة كهربائية والكترونيات': '/img/shops/electronics.jpg', 'صيانة ومقاولات': '/img/shops/maintenance.jpg',
+  'دراي كلين': '/img/shops/dryclean.jpg', 'محلات فلترة المياه': '/img/shops/water.jpg',
+  'أخرى': '/img/shops/spices.jpg',
+};
+
 let me = App.load('customer') || null;            // بيانات الزبون
 let cart = App.loadLocal('cart') || {};           // {shopId: {productId: qty}}
 let currentShop = null;                           // المحل المفتوح حالياً
@@ -47,15 +56,22 @@ async function doLogin() {
   const phone = document.getElementById('in-phone').value.trim();
   const address = document.getElementById('in-address').value.trim();
   if (name.length < 2) return toast('اكتب اسمك أولاً 🙂', 'bad');
-  if (!/^07\d{8}$/.test(phone)) return toast('رقم الجوال يجب أن يبدأ بـ 07 (10 أرقام)', 'bad');
+  if (phone.replace(/\D/g, '').length < 9) return toast('اكتب رقم جوال صحيح — مثال: 0791234567', 'bad');
   if (!address) return toast('اكتب عنوان التوصيل', 'bad');
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true;
+  btn.textContent = 'جارٍ الدخول…';
   try {
     const d = await App.post('/customers/login', { name, phone, address });
     me = d.customer;
     App.save('customer', me);
     renderHome();
     toast('أهلاً ' + me.name + ' 🌸', 'ok');
-  } catch (e) { toast(e.message, 'bad'); }
+  } catch (e) {
+    toast(e.message, 'bad');
+    btn.disabled = false;
+    btn.textContent = 'ابدأ الطلب 🌸';
+  }
 }
 
 /* ---------------- الإعلانات (مساحات إعلانية) ---------------- */
@@ -167,13 +183,13 @@ function paintShops() {
   }
   grid.innerHTML = list.map((s) => `
     <div class="shop-card" onclick="openShop('${s.id}')">
-      <div class="row">
-        <div class="icon">${s.icon}</div>
-        <div class="flex1">
-          <h3>${escapeHtml(s.name)}</h3>
-          <div class="muted small">${escapeHtml(s.category)} • ${s.productCount} منتج • ⭐ ${s.rating}</div>
-        </div>
-        <div>${s.isOpen ? '<span class="badge-open">● مفتوح</span>' : '<span class="badge-closed">● مغلق</span>'}</div>
+      <div class="shop-photo${s.image ? '' : ' no-img'}${s.isOpen ? '' : ' closed'}">
+        ${s.image ? `<img src="${s.image}" alt="${escapeHtml(s.name)}" loading="lazy">` : `<span class="ph-emoji">${s.icon}</span>`}
+        <span class="open-flag ${s.isOpen ? 'on' : 'off'}">${s.isOpen ? '● مفتوح' : '● مغلق'}</span>
+      </div>
+      <div class="sp-body">
+        <h3>${escapeHtml(s.name)}</h3>
+        <div class="muted small">${escapeHtml(s.category)} • ${s.productCount} منتج • ⭐ ${s.rating}</div>
       </div>
     </div>
   `).join('');
@@ -203,6 +219,7 @@ async function openShop(id) {
   try {
     const d = await App.get('/shops/' + id);
     currentShop = d.shop;
+    currentShop.image = currentShop.image || CAT_IMG[currentShop.category] || null;
     renderShopPage();
   } catch (e) { toast(e.message, 'bad'); }
 }
@@ -220,6 +237,7 @@ function renderShopPage() {
   let html = `
     <button class="btn ghost sm" onclick="renderHome()">← رجوع للمحلات</button>
     <div style="height:10px"></div>
+    ${s.image ? `<div class="shop-banner" style="background-image:url('${s.image}')"></div>` : ''}
     <div class="card">
       <div class="row between">
         <div>
@@ -342,7 +360,10 @@ function openCheckout() {
   };
 }
 
-/* ---------------- طلباتي ---------------- */
+/* ---------------- طلباتي (مع تبويبات وإعادة طلب) ---------------- */
+
+let ordersTab = 'active'; // active | past
+let ORDERS_CACHE = [];    // ذاكرة الطلبات الحالية
 
 async function refreshBubble() {
   if (!me) return;
@@ -363,22 +384,46 @@ async function renderOrders() {
   el.innerHTML = '<div class="empty">جارٍ التحميل…</div>';
   try {
     const d = await App.get('/orders?customer=' + me.phone);
-    const active = d.orders.filter((o) => !['delivered', 'rejected', 'cancelled'].includes(o.status));
-    const bubble = document.getElementById('orders-bubble');
-    bubble.style.display = active.length ? '' : 'none';
-    bubble.textContent = active.length;
+    paintOrders(d.orders);
+    setPoll(async () => {
+      try {
+        const dd = await App.get('/orders?customer=' + me.phone);
+        paintOrders(dd.orders);
+      } catch { /* تجاهل */ }
+    }, 5000);
+  } catch (e) {
+    el.innerHTML = `<div class="empty">⚠️ ${escapeHtml(e.message)}</div>`;
+  }
+}
 
-    if (!d.orders.length) {
-      el.innerHTML = `
-        <div class="empty">
-          <div class="e-icon">🧾</div>
-          <div class="e-title">لا توجد طلبات بعد</div>
-          تصفح المحلات واطلب أول طلبية 🌸
-          <div style="margin-top:14px"><button class="btn" onclick="renderHome()">تصفح المحلات</button></div>
-        </div>`;
-      return;
-    }
-    el.innerHTML = d.orders.map((o) => `
+function paintOrders(orders) {
+  ORDERS_CACHE = orders;
+  const el = document.getElementById('view-orders');
+  const active = orders.filter((o) => !['delivered', 'rejected', 'cancelled'].includes(o.status));
+  const past = orders.filter((o) => ['delivered', 'rejected', 'cancelled'].includes(o.status));
+  const list = ordersTab === 'active' ? active : past;
+  const bubble = document.getElementById('orders-bubble');
+  bubble.style.display = active.length ? '' : 'none';
+  bubble.textContent = active.length;
+
+  if (!orders.length) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="e-icon">🧾</div>
+        <div class="e-title">لا توجد طلبات بعد</div>
+        تصفح المحلات واطلب أول طلبية 🌸
+        <div style="margin-top:14px"><button class="btn" onclick="renderHome()">تصفح المحلات</button></div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="tabs">
+      <button class="${ordersTab === 'active' ? 'active' : ''}" onclick="ordersTab='active';paintOrders(ORDERS_CACHE)">النشطة (${active.length})</button>
+      <button class="${ordersTab === 'past' ? 'active' : ''}" onclick="ordersTab='past';paintOrders(ORDERS_CACHE)">السابقة (${past.length})</button>
+    </div>
+    ${!list.length ? `<div class="empty"><div class="e-icon">${ordersTab === 'active' ? '🧾' : '📁'}</div><div class="e-title">${ordersTab === 'active' ? 'لا طلبات نشطة حالياً' : 'لا طلبات سابقة'}</div></div>`
+      : list.map((o) => `
       <div class="card order-card" onclick="openTrack('${o.id}')">
         <div class="oc-top">
           <span class="oc-code">طلب #${o.code}</span>
@@ -390,42 +435,36 @@ async function renderOrders() {
           <span class="muted small">🕐 ${App.dt(o.createdAt)}</span>
           <span class="oc-total">${App.fmt(o.total)}</span>
         </div>
-      </div>
-    `).join('');
-    setPoll(() => { renderOrdersSilently(); }, 5000);
-  } catch (e) {
-    el.innerHTML = `<div class="empty">⚠️ ${escapeHtml(e.message)}</div>`;
-  }
+        ${o.status === 'delivered' ? `
+          <div style="margin-top:9px" onclick="event.stopPropagation()">
+            <button class="btn soft sm block" onclick="reorder('${o.id}')">🔁 إعادة نفس الطلب</button>
+          </div>` : ''}
+      </div>`).join('')}
+  `;
 }
 
-async function renderOrdersSilently() {
-  if (document.getElementById('view-orders').style.display === 'none') return;
+// إعادة طلب سابق: يعيد الأصناف المتوفرة إلى السلة
+async function reorder(orderId) {
   try {
-    const d = await App.get('/orders?customer=' + me.phone);
-    el_update(d.orders);
-  } catch { /* تجاهل */ }
-}
-
-function el_update(orders) {
-  const el = document.getElementById('view-orders');
-  const active = orders.filter((o) => !['delivered', 'rejected', 'cancelled'].includes(o.status));
-  const bubble = document.getElementById('orders-bubble');
-  bubble.style.display = active.length ? '' : 'none';
-  bubble.textContent = active.length;
-  el.innerHTML = orders.map((o) => `
-    <div class="card order-card" onclick="openTrack('${o.id}')">
-      <div class="oc-top">
-        <span class="oc-code">طلب #${o.code}</span>
-        ${chip(o.status)}
-      </div>
-      <div class="oc-shop">${o.shopIcon} ${escapeHtml(o.shopName)}</div>
-      <div class="oc-items">${o.items.map((i) => i.emoji + ' ' + escapeHtml(i.name) + ' ×' + i.qty).join(' • ')}</div>
-      <div class="oc-foot">
-        <span class="muted small">🕐 ${App.dt(o.createdAt)}</span>
-        <span class="oc-total">${App.fmt(o.total)}</span>
-      </div>
-    </div>
-  `).join('');
+    const o = ORDERS_CACHE.find((x) => x.id === orderId);
+    if (!o) return;
+    const d = await App.get('/shops/' + o.shopId);
+    const shop = d.shop;
+    if (!shop.isOpen) return toast('المحل مغلق حالياً', 'bad');
+    const c = cartOf(o.shopId);
+    let added = 0, missing = 0;
+    for (const it of o.items) {
+      const p = shop.products.find((x) => x.id === it.productId && x.available);
+      if (p) { c[it.productId] = Math.min(99, (c[it.productId] || 0) + it.qty); added++; }
+      else missing++;
+    }
+    if (!added) return toast('أصناف هذا الطلب لم تعد متوفرة', 'bad');
+    cart[o.shopId] = c;
+    persistCart();
+    toast('أُضيفت ' + added + ' أصناف للسلة' + (missing ? ' (' + missing + ' غير متوفرة)' : '') + ' 🛒', 'ok');
+    currentShop = shop;
+    renderShopPage();
+  } catch (e) { toast(e.message, 'bad'); }
 }
 
 /* ---------------- متابعة الطلب ---------------- */
@@ -442,6 +481,7 @@ async function renderTrack() {
   try {
     const d = await App.get('/orders/' + trackOrderId);
     const o = d.order;
+    const drvLoc = d.driverLocation || null;
     document.getElementById('hdr-title').textContent = 'طلب #' + o.code;
     document.getElementById('hdr-sub').textContent = STATUS[o.status].label;
 
@@ -465,6 +505,7 @@ async function renderTrack() {
     }).join('');
 
     const canCancel = ['pending', 'accepted'].includes(o.status);
+    const showMap = ['assigned', 'picked_up'].includes(o.status);
 
     el.innerHTML = `
       <button class="btn ghost sm" onclick="renderOrders()">← رجوع لطلباتي</button>
@@ -478,6 +519,15 @@ async function renderTrack() {
         <div class="muted small">📍 ${escapeHtml(o.address)}</div>
         ${o.notes ? `<div class="muted small">📝 ${escapeHtml(o.notes)}</div>` : ''}
       </div>
+
+      ${showMap ? `
+      <div class="card">
+        <div class="section-title" style="margin-top:0">🛵 موقع السائق المباشر</div>
+        ${drvLoc ? `
+          <div id="drv-map" class="map-box"></div>
+          <div class="muted small" style="margin-top:6px">آخر تحديث: ${App.time(drvLoc.updatedAt)} — <a href="https://maps.google.com/?q=${drvLoc.lat},${drvLoc.lng}" target="_blank" style="color:var(--v1)">افتح في خرائط جوجل ↗</a></div>
+        ` : '<div class="empty" style="padding:14px"><div class="e-icon">📡</div>السائق لم يُفعّل مشاركة الموقع بعد — سيظهر هنا فور تحركه</div>'}
+      </div>` : ''}
 
       <div class="card">
         <div class="section-title" style="margin-top:0">🚚 حالة الطلب</div>
@@ -499,6 +549,21 @@ async function renderTrack() {
         </div>
       </div>
     `;
+
+    // خريطة السائق (Leaflet عبر الإنترنت — وفي المعاينة المعزولة يظهر البديل النصي)
+    if (showMap && drvLoc) {
+      const mapEl = document.getElementById('drv-map');
+      if (mapEl && typeof L !== 'undefined') {
+        try {
+          const map = L.map('drv-map').setView([drvLoc.lat, drvLoc.lng], 15);
+          L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+          L.marker([drvLoc.lat, drvLoc.lng]).addTo(map).bindPopup('🛵 موقع السائق').openPopup();
+          setTimeout(() => map.invalidateSize(), 300);
+        } catch { if (mapEl) mapEl.innerHTML = '<div class="empty" style="padding:12px">تعذر تحميل الخريطة — استخدم رابط خرائط جوجل بالأعلى</div>'; }
+      } else if (mapEl) {
+        mapEl.innerHTML = `<div class="empty" style="padding:12px">📡 إحداثيات السائق: ${drvLoc.lat}, ${drvLoc.lng}<br><a href="https://maps.google.com/?q=${drvLoc.lat},${drvLoc.lng}" target="_blank" style="color:var(--v1)">افتح الموقع في خرائط جوجل ↗</a></div>`;
+      }
+    }
 
     const cancelBtn = document.getElementById('btn-cancel');
     if (cancelBtn) {
@@ -562,6 +627,15 @@ function renderAccount() {
 }
 
 /* ---------------- التهيئة ---------------- */
+
+// ربط زر «ابدأ الطلب» (كان مفقوداً — هذا سبب عدم عمل الزر)
+document.getElementById('btn-login').addEventListener('click', doLogin);
+document.getElementById('in-address').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('in-phone').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('in-address').focus();
+});
 
 document.querySelectorAll('#nav a').forEach((a) => {
   a.addEventListener('click', (e) => {

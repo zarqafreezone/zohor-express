@@ -28,16 +28,19 @@ async function renderLogin() {
   try {
     const d = await App.get('/shops?all=1');
     if (!d.shops.length) { list.innerHTML = '<div class="empty">لا توجد محلات مسجلة</div>'; return; }
-    list.innerHTML = '<h3 style="margin-bottom:6px; font-size:15px">اختر محلك:</h3>' + d.shops.map((s) => `
-      <div class="list-link" onclick="doLogin('${s.id}')">
-        <div class="icon">${s.icon}</div>
+    list.innerHTML = `
+      <h3 style="margin-bottom:4px; font-size:15px">اختر محلك وأدخل رقمك السري:</h3>
+      <p class="muted small" style="margin-bottom:8px">🔑 المحلات التجريبية رقمها السري: <b>1234</b></p>
+      ${d.shops.map((x) => `
+      <div class="list-link" onclick="askPass('${x.id}','${escapeHtml(x.name).replace(/'/g, '&#39;')}','${x.icon}')">
+        <div class="icon">${x.icon}</div>
         <div class="flex1">
-          <h4>${escapeHtml(s.name)} ${s.status === 'pending' ? '<span class="chip warn">بانتظار الموافقة</span>' : ''} ${s.status === 'blocked' ? '<span class="chip bad">موقوف</span>' : ''}</div>
-          <div class="sub">${escapeHtml(s.category)}</div>
+          <h4>${escapeHtml(x.name)} ${x.status === 'pending' ? '<span class="chip warn">قيد المراجعة</span>' : ''} ${x.status === 'blocked' ? '<span class="chip bad">موقوف</span>' : ''} ${x.status === 'active' && x.subscriptionActive === false ? '<span class="chip bad">اشتراك منتهي</span>' : ''}</div>
+          <div class="sub">${escapeHtml(x.category)}</div>
         </div>
         <span class="muted">دخول ←</span>
       </div>
-    `).join('');
+    `).join('')}`;
   } catch (e) {
     list.innerHTML = `<div class="empty">⚠️ ${escapeHtml(e.message)}</div>`;
   }
@@ -66,10 +69,12 @@ async function register() {
   const owner = el('rg-owner').value.trim();
   const phone = el('rg-phone').value.trim();
   const category = el('rg-category').value;
+  const password = el('rg-pass').value;
   if (!name || !owner) return toast('اكتب اسم المحل واسم المالك', 'bad');
   if (phone.replace(/\D/g, '').length < 9) return toast('اكتب رقم جوال صحيح — مثال: 0791234567', 'bad');
+  if (password.length < 4) return toast('اختر رقماً سرياً (4 خانات على الأقل) — ستحتاجه كل مرة تدخل لوحتك', 'bad');
   try {
-    const d = await App.post('/shops/register', { name, owner, phone, category });
+    const d = await App.post('/shops/register', { name, owner, phone, category, password });
     // دخول تلقائي على المحل الجديد — فترة تجريبية 14 يوم تعمل فوراً
     shop = d.shop;
     App.save('shop', shop);
@@ -94,7 +99,21 @@ async function renderDash() {
     ? (shop.trial ? '🎟️ فترة تجريبية مجانية — متبقي ' + daysLeft(shop.subscriptionUntil) + ' يوم' : 'فعّال حتى ' + new Date(shop.subscriptionUntil).toLocaleDateString('ar') + ' — متبقي ' + daysLeft(shop.subscriptionUntil) + ' يوم (اشتراك 10 دنانير شهرياً)')
     : 'انتهى الاشتراك — جدّد عبر إدارة التطبيق (10 دنانير شهرياً)';
 
+  // لافتة انتهاء الاشتراك
+  let exp = document.getElementById('expired-banner');
+  if (!active) {
+    if (!exp) {
+      exp = document.createElement('div');
+      exp.id = 'expired-banner';
+      exp.className = 'card';
+      exp.style.cssText = 'background:var(--bad-bg); border:1.5px solid var(--bad); margin-bottom:12px';
+      document.getElementById('sub-card').after(exp);
+    }
+    exp.innerHTML = '⛔ <b>انتهى اشتراك محلك</b> — مخفي حالياً عن الزبائن ولا يستقبل طلبات.<br>جدّد اشتراكك (10 دنانير/شهر) عبر إدارة التطبيق 📞';
+  } else if (exp) exp.remove();
+
   el('sw-open').checked = !!shop.isOpen;
+  el('sw-open').disabled = !active;
   updateOpenLbl();
   switchTab(dashTab);
 
@@ -232,8 +251,11 @@ function paintProducts() {
         </div>
       `; }).join('')}
     </div>
+    <button class="btn ghost sm block" id="btn-change-pass" style="margin-bottom:14px">🔑 تغيير الرقم السري</button>
   `;
   el('btn-add-product').onclick = addProduct;
+  const cpBtn = document.getElementById('btn-change-pass');
+  if (cpBtn) cpBtn.onclick = changePass;
   document.querySelectorAll('#tab-products button[data-offer]').forEach((b) => {
     b.onclick = async () => {
       const p = shop.products.find((x) => x.id === b.dataset.offer);

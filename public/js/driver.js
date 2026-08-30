@@ -8,6 +8,35 @@ let lastPoolCount = 0;
 
 const el = (id) => document.getElementById(id);
 
+/* ---------------- مشاركة الموقع المباشرة (GPS) ---------------- */
+let geoWatch = null;
+let lastLocSend = 0;
+
+function startGeo() {
+  if (geoWatch || !navigator.geolocation) return;
+  geoWatch = navigator.geolocation.watchPosition((pos) => {
+    const now = Date.now();
+    if (now - lastLocSend < 8000) return; // إرسال كل 8 ثوانٍ
+    lastLocSend = now;
+    App.patch('/drivers/' + driver.id + '/location', { lat: pos.coords.latitude, lng: pos.coords.longitude })
+      .then(() => {
+        const g = el('geo-ind');
+        if (g) { g.style.display = ''; g.textContent = '📡 مشاركة الموقع نشطة — الزبون يراك'; }
+      })
+      .catch(() => {});
+  }, () => {
+    const g = el('geo-ind');
+    if (g) { g.style.display = ''; g.textContent = '⚠️ تعذر الوصول للموقع — اسمح بصلاحية الموقع في متصفحك'; }
+  }, { enableHighAccuracy: true, maximumAge: 5000 });
+}
+
+function stopGeo() {
+  if (geoWatch) { navigator.geolocation.clearWatch(geoWatch); geoWatch = null; }
+  App.patch('/drivers/' + driver.id + '/location', {}).catch(() => {});
+  const g = el('geo-ind');
+  if (g) g.style.display = 'none';
+}
+
 /* ---------------- دخول ---------------- */
 
 function renderLogin() {
@@ -123,6 +152,11 @@ async function refresh() {
         <div class="oc-items">🧍 ${escapeHtml(o.customerName)} — 📱 ${escapeHtml(o.customerPhone)}</div>
         <div class="oc-items">📍 ${escapeHtml(o.address)}</div>
         ${o.notes ? `<div class="muted small">📝 ${escapeHtml(o.notes)}</div>` : ''}
+        <div class="row wrap" style="margin:6px 0">
+          <a class="btn soft sm" href="https://maps.google.com/?q=${encodeURIComponent(o.shopName + ' جبل الزهور عمان')}" target="_blank">🧭 انطلق للمحل</a>
+          <a class="btn soft sm" href="https://maps.google.com/?q=${encodeURIComponent(o.address + ' جبل الزهور عمان')}" target="_blank">🧭 انطلق للزبون</a>
+          <a class="btn ghost sm" href="tel:${escapeHtml(o.customerPhone)}">📞 الزبون</a>
+        </div>
         <div class="oc-foot">
           <span class="oc-total">${App.fmt(o.total)} <span class="muted small">(توصيل: ${App.fmt(o.deliveryFee)})</span></span>
           <div class="row">${nextAct}</div>
@@ -191,12 +225,16 @@ el('sw-online').onchange = async () => {
     const d = await App.patch('/drivers/' + driver.id, { online: el('sw-online').checked });
     driver = d.driver;
     App.save('driver', driver);
+    if (driver.online) { startGeo(); toast('أنت متاح الآن — شارك موقعك ليتبعك الزبون 📡', 'ok'); }
+    else { stopGeo(); toast('أنت غير متاح 🔴', 'ok'); }
     renderDash();
-    toast(driver.online ? 'أنت متاح الآن 🟢' : 'أنت غير متاح 🔴', 'ok');
   } catch (e) {
     toast(e.message, 'bad');
     el('sw-online').checked = driver.online;
   }
 };
+
+// عند فتح الصفحة: إن كان متاحاً من قبل نكمل مشاركة الموقع
+if (driver && driver.online) startGeo();
 
 if (driver) renderDash(); else renderLogin();

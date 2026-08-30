@@ -174,6 +174,7 @@ async function paintDrivers() {
           <h4>${escapeHtml(dr.name)} ${dr.status === 'blocked' ? '<span class="chip bad">موقوف</span>' : '<span class="chip ok">فعّال</span>'}</h4>
           <div class="sub">📱 ${escapeHtml(dr.phone)} • <span class="dot-online ${dr.online ? 'on' : ''}"></span> ${dr.online ? 'متاح الآن' : 'غير متاح'}</div>
           <div class="sub">🧾 ${dr.deliveries} توصيلة • أرباحه: ${App.fmt(dr.earnings)} • له ${orders.filter((o) => o.driverId === dr.id).length} طلب</div>
+          ${dr.location ? `<div class="sub">📍 موقعه الآن: <a href="https://maps.google.com/?q=${dr.location.lat},${dr.location.lng}" target="_blank" style="color:var(--v1)">${dr.location.lat}, ${dr.location.lng} ↗</a> (${App.time(dr.location.updatedAt)})</div>` : '<div class="sub">📍 لا موقع حالياً (يظهر عند تفعيله «متاح»)</div>'}
         </div>
         ${dr.status === 'active'
           ? `<button class="btn warn sm" data-blockdrv="${dr.id}">⏸ إيقاف</button>`
