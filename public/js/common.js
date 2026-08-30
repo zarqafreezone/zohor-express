@@ -48,11 +48,11 @@ const App = {
 
 // حالات الطلب
 const STATUS = {
-  pending:   { label: 'بانتظار موافقة القالة', icon: '⏳', cls: 'warn' },
+  pending:   { label: 'بانتظار موافقة المحل', icon: '⏳', cls: 'warn' },
   accepted:  { label: 'قيد التحضير',           icon: '👨‍🍳', cls: 'info' },
   rejected:  { label: 'مرفوضة',                icon: '❌', cls: 'bad' },
   ready:     { label: 'جاهزة — بانتظار السائق', icon: '📦', cls: 'vio' },
-  assigned:  { label: 'السائق في الطريق للقالة', icon: '🛵', cls: 'info' },
+  assigned:  { label: 'السائق في الطريق للمحل', icon: '🛵', cls: 'info' },
   picked_up: { label: 'في الطريق إليك',        icon: '🚀', cls: 'info' },
   delivered: { label: 'تم التوصيل',            icon: '✅', cls: 'ok' },
   cancelled: { label: 'ملغاة',                 icon: '🚫', cls: 'gray' },

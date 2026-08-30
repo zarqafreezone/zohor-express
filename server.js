@@ -47,6 +47,18 @@ const CATEGORY_ICONS = {
 
 const SUBSCRIPTION_FEE = 10;   // دينار شهرياً من البقالة
 const ORDER_COMMISSION = 0.2;  // 20 قرش على كل طلب
+const TRIAL_DAYS = 14;         // فترة تجريبية مجانية للمحل الجديد
+
+/* تطبيع رقم الجوال: يقبل 07... أو +9627... أو 009627... أو 9627... */
+function normPhone(raw) {
+  let p = String(raw || '').replace(/[^\d+]/g, '');
+  if (p.startsWith('+962')) p = '0' + p.slice(4);
+  else if (p.startsWith('00962')) p = '0' + p.slice(5);
+  else if (p.startsWith('962') && p.length >= 11) p = '0' + p.slice(3);
+  else if (p.length === 9 && p.startsWith('7')) p = '0' + p;
+  return p;
+}
+const validPhone = (p) => /^07\d{8}$/.test(p);
 
 /* ---------------- قاعدة البيانات (ملف JSON) ---------------- */
 
@@ -70,12 +82,12 @@ function seedDb() {
   let id = 2000;
   const nid = () => (id += 1);
 
-  const P = (name, price, unit, emoji) => ({
+  const P = (name, price, unit, emoji, oldPrice) => ({
     id: 'p' + nid(), name, price, unit, emoji: emoji || '📦', available: true,
+    ...(oldPrice ? { oldPrice } : {}),
   });
 
-  return {
-    seq: id,
+  const data = {
     orderCode: 2000,
     settings: {
       adminPassword: 'admin123',
@@ -90,11 +102,11 @@ function seedDb() {
         category: 'بقالة', icon: '🛒', rating: 4.8, status: 'active', isOpen: true,
         subscriptionUntil: now + 21 * DAY, createdAt: now,
         products: [
+          P('زيت زيتون بلدي 1 لتر', 8.5, 'قنينة', '🫒', 10.0),
           P('خبز صاج', 0.3, 'ربطة', '🫓'),
           P('حليب طازج 1 لتر', 1.1, 'عبوة', '🥛'),
           P('بيض بلدي — طبق', 1.75, 'طبق', '🥚'),
           P('جبنة عكاوي 250غ', 2.25, 'علبة', '🧀'),
-          P('زيت زيتون بلدي 1 لتر', 8.5, 'قنينة', '🫒'),
           P('سكر 1 كغ', 0.9, 'كيس', '🍬'),
           P('أرز 1 كغ', 1.6, 'كيس', '🍚'),
           P('مياه معدنية 6×1.5ل', 1.8, 'عبوة', '💧'),
@@ -121,12 +133,12 @@ function seedDb() {
         category: 'مطعم', icon: '🍴', rating: 4.7, status: 'active', isOpen: true,
         subscriptionUntil: now + 27 * DAY, createdAt: now,
         products: [
+          P('مسخن دجاج', 3.5, 'طبق', '🍗', 4.5),
           P('مناقيش زعتر', 0.35, 'حبة', '🫓'),
           P('مناقيش جبنة', 0.6, 'حبة', '🧀'),
           P('فلافل — 12 حبة', 0.75, 'كيس', '🧆'),
           P('حمص بالطحينة', 1.25, 'طبق', '🥣'),
           P('فول مدمس', 1.0, 'طبق', '🫘'),
-          P('مسخن دجاج', 3.5, 'طبق', '🍗'),
           P('شاي بالنعنع', 0.25, 'كوب', '🍵'),
         ],
       },
@@ -161,9 +173,9 @@ function seedDb() {
         category: 'موبايلات واكسسوارات وبطاقات شحن', icon: '📱', rating: 4.7, status: 'active', isOpen: true,
         subscriptionUntil: now + 25 * DAY, createdAt: now,
         products: [
+          P('شاحن سريع Type-C', 4.5, 'حبة', '🔌', 5.5),
           P('بطاقة شحن أوريدو 5 دنانير', 5.25, 'بطاقة', '🎫'),
           P('بطاقة شحن زين 10 دنانير', 10.4, 'بطاقة', '💳'),
-          P('شاحن سريع Type-C', 4.5, 'حبة', '🔌'),
           P('سماعة سلكية', 2.0, 'حبة', '🎧'),
           P('كفر حماية', 1.5, 'حبة', '📱'),
           P('سكرين حماية زجاجية', 1.75, 'حبة', '🛡️'),
@@ -223,9 +235,9 @@ function seedDb() {
         category: 'محلات فلترة المياه', icon: '💧', rating: 4.7, status: 'active', isOpen: true,
         subscriptionUntil: now + 14 * DAY, createdAt: now,
         products: [
+          P('فلتر مياه منزلي 5 مراحل', 25.0, 'حبة', '🫗', 30.0),
           P('عبوة مياه مقطرة 40 لتر', 1.5, 'عبوة', '💧'),
           P('عبوة مياه معدنية 20 لتر', 1.0, 'عبوة', '🚰'),
-          P('فلتر مياه منزلي 5 مراحل', 25.0, 'حبة', '🫗'),
           P('كارتريدج فلتر بديل', 3.5, 'حبة', '🔄'),
           P('مضخة مياه كهربائية', 12.0, 'حبة', '⚙️'),
         ],
@@ -254,6 +266,9 @@ function seedDb() {
     ],
     orders: [],
   };
+  // مهم: العدّاد يُحفظ بعد بناء كل المعرفات — وإلا تكررت المعرّفات وتختلط بيانات المحلات!
+  data.seq = id;
+  return data;
 }
 
 function loadDb() {
@@ -339,13 +354,32 @@ async function handleApi(req, res, pathname, url) {
   } else if (m === 'GET' && pathname === '/api/ads') {
     return json(res, 200, { ads: db.ads.filter((a) => a.active) });
 
+  } else if (m === 'GET' && pathname === '/api/offers') {
+    // كل العروض والتخفيضات من المحلات الفعّالة
+    const offers = [];
+    for (const s of db.shops) {
+      if (s.status !== 'active') continue;
+      for (const p of s.products) {
+        if (p.oldPrice && p.oldPrice > p.price && p.available) {
+          offers.push({
+            shopId: s.id, shopName: s.name, shopIcon: s.icon,
+            product: p,
+            discount: Math.round((1 - p.price / p.oldPrice) * 100),
+          });
+        }
+      }
+    }
+    offers.sort((a, b) => b.discount - a.discount);
+    return json(res, 200, { offers });
+
   /* ---------- الزبون ---------- */
   } else if (m === 'POST' && pathname === '/api/customers/login') {
     const { name, phone, address } = body;
-    if (!phone || !/^07\d{8}$/.test(String(phone))) return bad(res, 'رقم الجوال يجب أن يبدأ بـ 07 ويتكون من 10 أرقام');
-    let c = db.customers.find((x) => x.phone === phone);
+    const norm = normPhone(phone);
+    if (!validPhone(norm)) return bad(res, 'رقم الجوال غير صحيح — مثال صحيح: 0791234567');
+    let c = db.customers.find((x) => x.phone === norm);
     if (!c) {
-      c = { id: nextId('c'), name: name || 'زبون', phone, address: address || '', createdAt: Date.now() };
+      c = { id: nextId('c'), name: name || 'زبون', phone: norm, address: address || '', createdAt: Date.now() };
       db.customers.push(c);
     } else {
       if (name) c.name = name;
@@ -366,14 +400,17 @@ async function handleApi(req, res, pathname, url) {
   } else if (m === 'POST' && pathname === '/api/shops/register') {
     const { name, owner, phone, category } = body;
     if (!name || !owner || !phone) return bad(res, 'يرجى تعبئة جميع الحقول');
-    if (!/^07\d{8}$/.test(String(phone))) return bad(res, 'رقم الجوال يجب أن يبدأ بـ 07 ويتكون من 10 أرقام');
-    const exists = db.shops.find((s) => s.phone === phone);
-    if (exists) return bad(res, 'يوجد حساب مسجل بهذا الرقم مسبقاً');
+    const norm = normPhone(phone);
+    if (!validPhone(norm)) return bad(res, 'رقم الجوال غير صحيح — مثال صحيح: 0791234567');
+    const exists = db.shops.find((s) => s.phone === norm);
+    if (exists) return bad(res, 'يوجد محل مسجل بهذا الرقم مسبقاً — ادخل عليه من القائمة');
     const cat = CATEGORIES.includes(category) ? category : 'أخرى';
     const shop = {
-      id: nextId('s'), name, owner, phone,
+      id: nextId('s'), name, owner, phone: norm,
       category: cat, icon: CATEGORY_ICONS[cat], rating: 5,
-      status: 'pending', isOpen: true, subscriptionUntil: null,
+      status: 'active', isOpen: true,
+      subscriptionUntil: Date.now() + TRIAL_DAYS * 86400000,
+      trial: true,
       createdAt: Date.now(), products: [],
     };
     db.shops.push(shop);
@@ -423,6 +460,9 @@ async function handleApi(req, res, pathname, url) {
       if (body.emoji) product.emoji = body.emoji;
       if (body.price != null && !isNaN(+body.price)) product.price = round2(+body.price);
       if (typeof body.available === 'boolean') product.available = body.available;
+      // نظام العروض: oldPrice = السعر قبل التخفيض (null لإلغاء العرض)
+      if (body.oldPrice === null) delete product.oldPrice;
+      else if (body.oldPrice != null && !isNaN(+body.oldPrice) && +body.oldPrice > 0) product.oldPrice = round2(+body.oldPrice);
       saveDb();
       return json(res, 200, { product, shop });
     }
@@ -439,7 +479,7 @@ async function handleApi(req, res, pathname, url) {
     if (!shop) return bad(res, 'البقالة غير موجودة', 404);
     if (shop.status !== 'active') return bad(res, 'هذه البقالة غير مفعّلة حالياً');
     if (!shop.isOpen) return bad(res, 'البقالة مغلقة حالياً، جرّب لاحقاً');
-    if (!customer || !/^07\d{8}$/.test(String(customer.phone || ''))) return bad(res, 'رقم جوال الزبون غير صحيح');
+    if (!customer || !validPhone(normPhone(customer.phone))) return bad(res, 'رقم جوال الزبون غير صحيح');
     if (!customer.address || !String(customer.address).trim()) return bad(res, 'العنوان مطلوب للتوصيل');
     if (!Array.isArray(items) || !items.length) return bad(res, 'السلة فارغة');
 
@@ -456,9 +496,10 @@ async function handleApi(req, res, pathname, url) {
     const deliveryFee = db.settings.deliveryFee;
 
     // إنشاء/تحديث بيانات الزبون
-    let cust = db.customers.find((x) => x.phone === customer.phone);
+    const custPhone = normPhone(customer.phone);
+    let cust = db.customers.find((x) => x.phone === custPhone);
     if (!cust) {
-      cust = { id: nextId('c'), name: customer.name || 'زبون', phone: customer.phone, address: customer.address, createdAt: Date.now() };
+      cust = { id: nextId('c'), name: customer.name || 'زبون', phone: custPhone, address: customer.address, createdAt: Date.now() };
       db.customers.push(cust);
     } else {
       cust.name = customer.name || cust.name;
@@ -548,10 +589,11 @@ async function handleApi(req, res, pathname, url) {
   /* ---------- السائقون ---------- */
   } else if (m === 'POST' && pathname === '/api/drivers/login') {
     const { name, phone } = body;
-    if (!phone || !/^07\d{8}$/.test(String(phone))) return bad(res, 'رقم الجوال يجب أن يبدأ بـ 07 ويتكون من 10 أرقام');
-    let d = db.drivers.find((x) => x.phone === phone);
+    const norm = normPhone(phone);
+    if (!validPhone(norm)) return bad(res, 'رقم الجوال غير صحيح — مثال صحيح: 0791234567');
+    let d = db.drivers.find((x) => x.phone === norm);
     if (!d) {
-      d = { id: nextId('d'), name: name || 'سائق', phone, status: 'active', online: false, deliveries: 0, earnings: 0, createdAt: Date.now() };
+      d = { id: nextId('d'), name: name || 'سائق', phone: norm, status: 'active', online: false, deliveries: 0, earnings: 0, createdAt: Date.now() };
       db.drivers.push(d);
     } else if (name) {
       d.name = name;

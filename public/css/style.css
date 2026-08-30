@@ -363,6 +363,46 @@ textarea.input { resize: vertical; min-height: 64px; }
 .ad-banner .ad-body { font-size: 12px; color: #a16207; }
 .ad-banner .ad-next { font-size: 22px; color: #f59e0b; font-weight: 800; flex: none; }
 
+/* ---------------- بطاقات العروض والتخفيضات ---------------- */
+
+.offers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 9px;
+  margin-bottom: 14px;
+}
+.offer-card {
+  background: linear-gradient(160deg, #fff, #fff7ed);
+  border: 1.5px solid #fdba74;
+  border-radius: 15px;
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.offer-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(245, 158, 11, 0.25); }
+.offer-card .o-disc {
+  position: absolute; top: -8px; right: 50%;
+  transform: translateX(50%);
+  background: linear-gradient(135deg, #ea580c, #f59e0b);
+  color: #fff; font-size: 11px; font-weight: 800;
+  padding: 2px 9px; border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.4);
+}
+.offer-card .o-emoji { font-size: 27px; margin-top: 6px; }
+.offer-card .o-name {
+  font-size: 12px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.offer-card .o-prices { margin: 3px 0; }
+.offer-card .o-old {
+  font-size: 10.5px; color: var(--mut);
+  text-decoration: line-through; margin-left: 4px;
+}
+.offer-card .o-new { font-size: 13px; color: var(--v1); }
+.offer-card .o-shop { font-size: 10.5px; color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* ---------------- الخط الزمني ---------------- */
 
 .timeline { margin: 10px 4px 0; }

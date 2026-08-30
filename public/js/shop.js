@@ -67,13 +67,15 @@ async function register() {
   const phone = el('rg-phone').value.trim();
   const category = el('rg-category').value;
   if (!name || !owner) return toast('اكتب اسم المحل واسم المالك', 'bad');
-  if (!/^07\d{8}$/.test(phone)) return toast('رقم الجوال يجب أن يبدأ بـ 07 (10 أرقام)', 'bad');
+  if (phone.replace(/\D/g, '').length < 9) return toast('اكتب رقم جوال صحيح — مثال: 0791234567', 'bad');
   try {
-    await App.post('/shops/register', { name, owner, phone, category });
-    toast('أُرسل طلب التسجيل — بانتظار موافقة الإدارة ⏳', 'ok');
-    el('rg-name').value = ''; el('rg-owner').value = ''; el('rg-phone').value = '';
-    el('register-card').style.display = 'none';
-    renderLogin();
+    const d = await App.post('/shops/register', { name, owner, phone, category });
+    // دخول تلقائي على المحل الجديد — فترة تجريبية 14 يوم تعمل فوراً
+    shop = d.shop;
+    App.save('shop', shop);
+    toast('🎉 أهلاً بك ' + shop.name + '! فترتك التجريبية 14 يوم بدأت — أضف منتجاتك الآن', 'ok');
+    dashTab = 'products';
+    renderDash();
   } catch (e) { toast(e.message, 'bad'); }
 }
 
@@ -89,7 +91,7 @@ async function renderDash() {
   el('sub-chip').className = 'chip ' + (active ? 'ok' : 'bad');
   el('sub-chip').textContent = active ? 'فعّال ✓' : 'غير فعّال';
   el('sub-lbl').textContent = active
-    ? 'فعّال حتى ' + new Date(shop.subscriptionUntil).toLocaleDateString('ar') + ' — متبقي ' + daysLeft(shop.subscriptionUntil) + ' يوم (اشتراك 10 دنانير شهرياً)'
+    ? (shop.trial ? '🎟️ فترة تجريبية مجانية — متبقي ' + daysLeft(shop.subscriptionUntil) + ' يوم' : 'فعّال حتى ' + new Date(shop.subscriptionUntil).toLocaleDateString('ar') + ' — متبقي ' + daysLeft(shop.subscriptionUntil) + ' يوم (اشتراك 10 دنانير شهرياً)')
     : 'انتهى الاشتراك — جدّد عبر إدارة التطبيق (10 دنانير شهرياً)';
 
   el('sw-open').checked = !!shop.isOpen;
@@ -208,20 +210,56 @@ function paintProducts() {
     </div>
     <div class="card">
       <h3 style="font-size:15px; margin-bottom:4px">📦 قائمة منتجاتك (${ps.length})</h3>
-      ${!ps.length ? '<div class="empty">لم تضف منتجات بعد</div>' : ps.map((p) => `
+      <p class="muted small" style="margin-bottom:6px">💡 زر «🏷️ تخفيض» يضع سعراً مخفضاً يظهر للزبون بشارة عرض وقسم العروض</p>
+      ${!ps.length ? '<div class="empty">لم تضف منتجات بعد — أضف أول منتج من الأعلى ⬆️</div>' : ps.map((p) => {
+        const disc = p.oldPrice && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0;
+        return `
         <div class="product-row" style="${p.available ? '' : 'opacity:.5'}">
           <div class="p-emoji">${p.emoji}</div>
           <div class="flex1">
-            <div class="p-name">${escapeHtml(p.name)}</div>
-            <div class="p-unit">${escapeHtml(p.unit)} • ${App.fmt(p.price)} ${p.available ? '' : '• <b style="color:var(--bad)">غير متوفر</b>'}</div>
+            <div class="p-name">${escapeHtml(p.name)} ${disc ? `<span class="chip warn">🔥 خصم ${disc}%</span>` : ''}</div>
+            <div class="p-unit">${escapeHtml(p.unit)} •
+              ${p.oldPrice ? `<span style="text-decoration:line-through">${App.fmt(p.oldPrice)}</span> ` : ''}
+              <b>${App.fmt(p.price)}</b>
+              ${p.available ? '' : '• <b style="color:var(--bad)">غير متوفر</b>'}
+            </div>
           </div>
+          ${disc
+            ? `<button class="btn soft sm" data-unoffer="${p.id}">إلغاء العرض</button>`
+            : `<button class="btn warn sm" data-offer="${p.id}">🏷️ تخفيض</button>`}
           <button class="btn soft sm" data-toggle="${p.id}">${p.available ? 'إخفاء' : 'إظهار'}</button>
           <button class="btn bad sm icon" data-del="${p.id}">🗑</button>
         </div>
-      `).join('')}
+      `; }).join('')}
     </div>
   `;
   el('btn-add-product').onclick = addProduct;
+  document.querySelectorAll('#tab-products button[data-offer]').forEach((b) => {
+    b.onclick = async () => {
+      const p = shop.products.find((x) => x.id === b.dataset.offer);
+      const val = prompt(`🏷️ تخفيض «${p.name}»\nالسعر الحالي: ${App.fmt(p.price)}\n\nاكتب سعر العرض الجديد (أقل من الحالي):`, '');
+      if (val == null) return;
+      const newPrice = parseFloat(val);
+      if (isNaN(newPrice) || newPrice <= 0) return toast('سعر غير صحيح', 'bad');
+      if (newPrice >= p.price) return toast('سعر العرض يجب أن يكون أقل من السعر الحالي (' + App.fmt(p.price) + ')', 'bad');
+      try {
+        const d = await App.patch(`/shops/${shop.id}/products/${p.id}`, { price: newPrice, oldPrice: p.price });
+        shop = d.shop; App.save('shop', shop);
+        toast('🔥 بدأ العرض! سيظهر للزبائن بقسم العروض', 'ok');
+        paintProducts();
+      } catch (e) { toast(e.message, 'bad'); }
+    };
+  });
+  document.querySelectorAll('#tab-products button[data-unoffer]').forEach((b) => {
+    b.onclick = async () => {
+      try {
+        const d = await App.patch(`/shops/${shop.id}/products/${b.dataset.unoffer}`, { oldPrice: null });
+        shop = d.shop; App.save('shop', shop);
+        toast('أُلغي العرض', 'ok');
+        paintProducts();
+      } catch (e) { toast(e.message, 'bad'); }
+    };
+  });
   document.querySelectorAll('#tab-products button[data-toggle]').forEach((b) => {
     b.onclick = async () => {
       const p = shop.products.find((x) => x.id === b.dataset.toggle);

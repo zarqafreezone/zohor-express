@@ -118,9 +118,42 @@ async function renderHome() {
     ).join('');
 
     paintShops();
+
+    // قسم العروض والتخفيضات
+    try {
+      const od = await App.get('/offers');
+      paintOffers(od.offers || []);
+    } catch { paintOffers([]); }
   } catch (e) {
     grid.innerHTML = `<div class="empty">⚠️ ${escapeHtml(e.message)}</div>`;
   }
+}
+
+function paintOffers(offers) {
+  const wrap = document.getElementById('offers-section');
+  if (!wrap) return;
+  if (!offers.length) {
+    wrap.innerHTML = '';
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+  wrap.innerHTML = `
+    <div class="section-title">🔥 عروض وتخفيضات <span class="count">${offers.length}</span></div>
+    <div class="offers-grid">
+      ${offers.slice(0, 12).map((of) => `
+        <div class="offer-card" onclick="openShop('${of.shopId}')">
+          <div class="o-disc">-${of.discount}%</div>
+          <div class="o-emoji">${of.product.emoji}</div>
+          <div class="o-name">${escapeHtml(of.product.name)}</div>
+          <div class="o-prices">
+            <span class="o-old">${App.fmt(of.product.oldPrice)}</span>
+            <b class="o-new">${App.fmt(of.product.price)}</b>
+          </div>
+          <div class="o-shop">${of.shopIcon} ${escapeHtml(of.shopName)}</div>
+        </div>`).join('')}
+    </div>
+  `;
 }
 
 function setCat(c) { activeCat = c; renderHome(); }
@@ -206,14 +239,18 @@ function renderShopPage() {
   } else {
     html += s.products.map((p) => {
       const q = c[p.id] || 0;
+      const disc = p.oldPrice && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0;
       return `
         <div class="product-row" style="${p.available ? '' : 'opacity:.45'}">
           <div class="p-emoji">${p.emoji}</div>
           <div class="flex1">
-            <div class="p-name">${escapeHtml(p.name)} ${p.available ? '' : '<span class="chip gray">غير متوفر</span>'}</div>
+            <div class="p-name">${escapeHtml(p.name)} ${disc ? `<span class="chip warn">🔥 خصم ${disc}%</span>` : ''} ${p.available ? '' : '<span class="chip gray">غير متوفر</span>'}</div>
             <div class="p-unit">${escapeHtml(p.unit)}</div>
           </div>
-          <div class="p-price">${App.fmt(p.price)}</div>
+          <div class="p-price">
+            ${disc ? `<span style="display:block; font-size:11px; font-weight:400; color:var(--mut); text-decoration:line-through">${App.fmt(p.oldPrice)}</span>` : ''}
+            ${App.fmt(p.price)}
+          </div>
           <div class="qty-ctl">
             ${q > 0 ? `<button onclick="changeQty('${p.id}',-1)">−</button><span class="q">${q}</span>` : ''}
             <button class="add" onclick="changeQty('${p.id}',1)" ${p.available && s.isOpen ? '' : 'disabled'}>+</button>
