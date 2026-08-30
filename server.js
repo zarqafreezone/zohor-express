@@ -29,6 +29,7 @@ const CATEGORIES = [
   'صيانة ومقاولات',
   'دراي كلين',
   'مياه شرب',
+  'ادوات منزلية',
   'أخرى',
 ];
 
@@ -62,6 +63,7 @@ const CATEGORY_IMAGES = {
   'صيانة ومقاولات': '/img/shops/maintenance.jpg',
   'دراي كلين': '/img/shops/dryclean.jpg',
   'مياه شرب': '/img/shops/water.jpg',
+  'ادوات منزلية': '/img/shops/housewares.jpg',
   'أخرى': '/img/shops/spices.jpg',
 };
 

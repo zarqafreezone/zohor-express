@@ -609,7 +609,7 @@ function renderAccount() {
       <div class="prow2"><span class="pl">📲 موبايل إضافي</span><b dir="ltr">${me.phone2 ? escapeHtml(me.phone2) : '<span class="muted">غير مسجل</span>'}</b></div>
       <div class="prow2"><span class="pl">🏘️ الحي / المنطقة</span><b>${escapeHtml(me.area || '—')}</b></div>
       <div class="prow2"><span class="pl">🛣️ الشارع</span><b>${escapeHtml(me.street || '—')}</b></div>
-      <div class="prow2"><span class="pl">🏢 البناية / الدور</span><b>${escapeHtml(me.building || '—')}</b></div>
+      <div class="prow2"><span class="pl">🏢 البناية / الطابق</span><b>${escapeHtml(me.building || '—')}</b></div>
       <div class="prow2" style="border-bottom:none"><span class="pl">📍 علامة مميزة</span><b>${escapeHtml(me.landmark || '—')}</b></div>
     </div>
     <button class="btn block" id="ac-edit">✏️ تعديل بطاقتي</button>
@@ -625,7 +625,7 @@ function renderAccount() {
       <div class="field"><label>الحي / المنطقة</label><input class="input" id="cf-area" value="${escapeHtml(me.area || '')}"></div>
       <div class="grid2">
         <div class="field"><label>الشارع</label><input class="input" id="cf-street" value="${escapeHtml(me.street || '')}"></div>
-        <div class="field"><label>البناية / الدور</label><input class="input" id="cf-building" value="${escapeHtml(me.building || '')}"></div>
+        <div class="field"><label>البناية / الطابق</label><input class="input" id="cf-building" value="${escapeHtml(me.building || '')}"></div>
       </div>
       <div class="field"><label>علامة مميزة</label><input class="input" id="cf-landmark" value="${escapeHtml(me.landmark || '')}"></div>
       <button class="btn ok block" id="cf-save">💾 حفظ</button>
