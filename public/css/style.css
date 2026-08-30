@@ -724,3 +724,26 @@ input[type="file"]::file-selector-button {
   object-fit: cover;
   margin-top: 6px;
 }
+
+/* ---------------- شريط أعلى الصفحة الرئيسية ---------------- */
+
+.top-bar {
+  max-width: 540px;
+  margin: 0 auto;
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px 0;
+  justify-content: center;
+}
+.tb-btn {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 9px 22px;
+  font-weight: 800;
+  font-size: 13.5px;
+  color: var(--mut);
+  text-decoration: none;
+  box-shadow: 0 2px 10px rgba(109, 40, 217, 0.06);
+}
+.tb-btn.active { background: var(--v3); color: var(--v1); border-color: var(--v2); }
