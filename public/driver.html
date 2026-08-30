@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>السائق — الزهور اكسبرس</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🛵%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo">🛵</div>
+    <div class="titles">
+      <h1 id="hdr-title">الزهور اكسبرس</h1>
+      <div class="sub" id="hdr-sub">لوحة السائق</div>
+    </div>
+    <a class="hdr-btn" href="/" style="text-decoration:none">الرئيسية</a>
+  </header>
+
+  <!-- دخول السائق -->
+  <div class="container" id="view-login" style="display:none">
+    <div class="login-hero">
+      <div class="big">🛵</div>
+      <h2>انضم لسائقين الزهور اكسبرس</h2>
+      <p>وصّل طلبات جبل الزهور واكسب رسوم التوصيل (0.50 د.أ للطلب)</p>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label>الاسم</label>
+        <input class="input" id="in-name" placeholder="مثال: أبو يزن">
+      </div>
+      <div class="field">
+        <label>رقم الجوال</label>
+        <input class="input" id="in-phone" type="tel" inputmode="numeric" placeholder="07xxxxxxxx" maxlength="10">
+      </div>
+      <button class="btn block" id="btn-login">دخول 🚀</button>
+      <p class="muted small" style="margin-top:8px">إن كان رقمك مسجلاً سندخلك على حسابك، وإلا سننشئ لك حساباً جديداً</p>
+    </div>
+  </div>
+
+  <!-- لوحة السائق -->
+  <div class="container" id="view-dash" style="display:none">
+    <div class="card row between">
+      <div>
+        <h4 style="font-size:14.5px" id="drv-name">—</h4>
+        <div class="muted small" id="drv-status">—</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="sw-online">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="grid3" style="margin-bottom:14px">
+      <div class="stat"><div class="num" id="st-deliveries">0</div><div class="lbl">توصيلات</div></div>
+      <div class="stat"><div class="num" id="st-earnings">0.00</div><div class="lbl">أرباحك (د.أ)</div></div>
+      <div class="stat"><div class="num" id="st-active">0</div><div class="lbl">مهام حالية</div></div>
+    </div>
+
+    <div class="section-title">📦 طلبات جاهزة للاستلام <span class="count" id="pool-count">0</span></div>
+    <div id="pool"></div>
+
+    <div class="section-title">🔄 مهامي الحالية <span class="count" id="mine-count">0</span></div>
+    <div id="mine"></div>
+
+    <div class="section-title">📁 سجل التوصيلات</div>
+    <div id="history"></div>
+  </div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/driver.js"></script>
+</body>
+</html>

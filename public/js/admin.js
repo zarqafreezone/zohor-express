@@ -1,0 +1,300 @@
+/* ============================================================
+   الزهور اكسبرس — لوحة الإدارة
+   ============================================================ */
+'use strict';
+
+let adminOk = App.load('admin') === true;
+let currentTab = 'overview';
+
+const el = (id) => document.getElementById(id);
+
+/* ---------------- الدخول ---------------- */
+
+function renderLogin() {
+  el('view-dash').style.display = 'none';
+  el('view-login').style.display = '';
+  el('btn-logout').style.display = 'none';
+}
+
+async function doLogin() {
+  const p = el('in-pass').value;
+  try {
+    await App.post('/admin/login', { password: p });
+    adminOk = true;
+    App.save('admin', true);
+    renderDash();
+  } catch (e) { toast(e.message, 'bad'); }
+}
+
+function logout() {
+  adminOk = false;
+  App.clear('admin');
+  renderLogin();
+}
+
+/* ---------------- تبديل التبويبات ---------------- */
+
+function switchTab(t) {
+  currentTab = t;
+  document.querySelectorAll('#admin-tabs button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.tab === t);
+  });
+  ['overview', 'shops', 'drivers', 'orders', 'ads'].forEach((x) => {
+    el('tab-' + x).style.display = x === t ? '' : 'none';
+  });
+  refreshTab();
+}
+
+async function refreshTab() {
+  try {
+    if (currentTab === 'overview') await paintOverview();
+    else if (currentTab === 'shops') await paintShops();
+    else if (currentTab === 'drivers') await paintDrivers();
+    else if (currentTab === 'orders') await paintOrders();
+    else if (currentTab === 'ads') await paintAds();
+  } catch (e) {
+    toast(e.message, 'bad');
+  }
+}
+
+/* ---------------- نظرة عامة ---------------- */
+
+async function paintOverview() {
+  const d = await App.get('/admin/overview');
+  const s = d.stats;
+  el('tab-overview').innerHTML = `
+    <div class="section-title">💰 إيرادات المنصة (نموذج الاشتراك + العمولة + الإعلانات)</div>
+    <div class="grid3">
+      <div class="stat" style="background:linear-gradient(135deg,#4c1d95,#6d28d9); color:#fff">
+        <div class="num" style="color:#fff">${s.platformRevenue.toFixed(2)}</div>
+        <div class="lbl" style="color:#e9e4ff">إجمالي إيرادات المنصة (د.أ)</div>
+      </div>
+      <div class="stat"><div class="num">${s.monthlySubscriptions.toFixed(2)}</div><div class="lbl">اشتراكات شهرية (${s.activeShops} محل × 10 د.أ)</div></div>
+      <div class="stat"><div class="num">${s.commissionsTotal.toFixed(2)}</div><div class="lbl">عمولة الطلبات (20 قرش × الطلب)</div></div>
+    </div>
+
+    <div class="section-title">📊 حالة التطبيق الآن</div>
+    <div class="grid3">
+      <div class="stat"><div class="num">${s.ordersToday}</div><div class="lbl">طلبات اليوم</div></div>
+      <div class="stat"><div class="num">${s.activeOrders}</div><div class="lbl">طلبات نشطة</div></div>
+      <div class="stat"><div class="num">${s.totalOrders}</div><div class="lbl">كل الطلبات</div></div>
+      <div class="stat"><div class="num">${s.revenueToday.toFixed(2)}</div><div class="lbl">مبيعات اليوم (د.أ)</div></div>
+      <div class="stat"><div class="num">${s.activeShops}</div><div class="lbl">محلات فعّالة</div></div>
+      <div class="stat"><div class="num">${s.onlineDrivers}<span class="muted small">/${s.totalDrivers}</span></div><div class="lbl">سائقون متاحون</div></div>
+      <div class="stat"><div class="num">${s.totalCustomers}</div><div class="lbl">زبائن مسجلون</div></div>
+      <div class="stat"><div class="num">${s.activeAds}</div><div class="lbl">إعلانات معروضة</div></div>
+      ${s.pendingShops ? `<div class="stat" style="border:1.5px solid var(--warn)"><div class="num" style="color:var(--warn)">${s.pendingShops}</div><div class="lbl">⏳ طلبات انضمام بحاجة موافقة</div></div>` : ''}
+    </div>
+
+    <div class="section-title">🧾 أحدث الطلبات</div>
+    ${d.latestOrders.length ? d.latestOrders.map((o) => `
+      <div class="card order-card">
+        <div class="oc-top">
+          <span class="oc-code">طلب #${o.code} • ${App.dt(o.createdAt)}</span>
+          ${chip(o.status)}
+        </div>
+        <div class="oc-shop">${o.shopIcon} ${escapeHtml(o.shopName)} → 🧍 ${escapeHtml(o.customerName)}</div>
+        <div class="oc-items">${o.items.map((i) => i.emoji + ' ' + escapeHtml(i.name) + ' ×' + i.qty).join(' • ')}</div>
+        <div class="oc-foot">
+          <span class="muted small">${o.driverName ? '🛵 ' + escapeHtml(o.driverName) : '—'} • عمولة المنصة: 0.20</span>
+          <span class="oc-total">${App.fmt(o.total)}</span>
+        </div>
+      </div>
+    `).join('') : '<div class="card"><div class="empty" style="padding:14px">لا طلبات بعد</div></div>'}
+  `;
+}
+
+/* ---------------- إدارة البقالات ---------------- */
+
+async function paintShops() {
+  const d = await App.get('/shops?all=1');
+  el('tab-shops').innerHTML = `
+    <div class="section-title">🏪 البقالات والمحلات <span class="count">${d.shops.length}</span></div>
+    ${d.shops.map((s) => {
+      const daysLeft = s.subscriptionUntil ? Math.ceil((s.subscriptionUntil - Date.now()) / 86400000) : null;
+      return `
+      <div class="card mng-row" style="flex-wrap:wrap">
+        <div class="icon">${s.icon}</div>
+        <div class="flex1">
+          <h4>${escapeHtml(s.name)} ${s.status === 'pending' ? '<span class="chip warn">بانتظار الموافقة</span>' : ''} ${s.status === 'blocked' ? '<span class="chip bad">موقوف</span>' : ''} ${s.status === 'active' ? '<span class="chip ok">فعّال</span>' : ''}</h4>
+          <div class="sub">${escapeHtml(s.category)} • ${s.productCount} منتج • ${s.isOpen ? '🟢 مفتوح' : '🔴 مغلق'}</div>
+          <div class="sub">📅 الاشتراك (10 د.أ/شهر): ${daysLeft == null ? '<b style="color:var(--bad)">غير مشترك</b>' : daysLeft > 0 ? `فعّال — متبقي ${daysLeft} يوم` : '<b style="color:var(--bad)">منتهي</b>'}</div>
+        </div>
+        <div class="row wrap">
+          ${s.status !== 'active' ? `<button class="btn ok sm" data-approve="${s.id}">✅ تنشيط</button>` : `<button class="btn warn sm" data-suspend="${s.id}">⏸ إيقاف</button>`}
+          <button class="btn soft sm" data-renew="${s.id}">📅 تجديد الاشتراك +30ي</button>
+          ${s.status === 'active' ? `<button class="btn ghost sm" data-open="${s.id}">${s.isOpen ? '🔒 إغلاق المحل' : '🔓 فتح المحل'}</button>` : ''}
+        </div>
+      </div>
+    `; }).join('')}
+  `;
+  bindShopsButtons();
+}
+
+function bindShopsButtons() {
+  document.querySelectorAll('[data-approve]').forEach((b) => b.onclick = async () => {
+    try {
+      await App.patch('/admin/shops/' + b.dataset.approve, { status: 'active' });
+      toast('نُشّط المحل ✅', 'ok'); paintShops();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
+  document.querySelectorAll('[data-suspend]').forEach((b) => b.onclick = async () => {
+    try {
+      await App.patch('/admin/shops/' + b.dataset.suspend, { status: 'blocked' });
+      toast('أُوقف المحل ⏸', 'ok'); paintShops();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
+  document.querySelectorAll('[data-renew]').forEach((b) => b.onclick = async () => {
+    try {
+      await App.patch('/admin/shops/' + b.dataset.renew, { action: 'renew' });
+      toast('جُدد الاشتراك 30 يوماً 📅 (+10 د.أ)', 'ok'); paintShops();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
+  document.querySelectorAll('[data-open]').forEach((b) => b.onclick = async () => {
+    const cur = b.textContent.includes('إغلاق');
+    try {
+      await App.patch('/admin/shops/' + b.dataset.open, { isOpen: !cur });
+      paintShops();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
+}
+
+/* ---------------- إدارة السائقين ---------------- */
+
+async function paintDrivers() {
+  const d = await App.get('/admin/drivers');
+  const drivers = d.drivers || [];
+  const orders = (await App.get('/orders')).orders;
+  el('tab-drivers').innerHTML = `
+    <div class="section-title">🛵 السائقون <span class="count">${drivers.length}</span></div>
+    ${drivers.length ? drivers.map((dr) => `
+      <div class="card mng-row">
+        <div class="icon">🛵</div>
+        <div class="flex1">
+          <h4>${escapeHtml(dr.name)} ${dr.status === 'blocked' ? '<span class="chip bad">موقوف</span>' : '<span class="chip ok">فعّال</span>'}</h4>
+          <div class="sub">📱 ${escapeHtml(dr.phone)} • <span class="dot-online ${dr.online ? 'on' : ''}"></span> ${dr.online ? 'متاح الآن' : 'غير متاح'}</div>
+          <div class="sub">🧾 ${dr.deliveries} توصيلة • أرباحه: ${App.fmt(dr.earnings)} • له ${orders.filter((o) => o.driverId === dr.id).length} طلب</div>
+        </div>
+        ${dr.status === 'active'
+          ? `<button class="btn warn sm" data-blockdrv="${dr.id}">⏸ إيقاف</button>`
+          : `<button class="btn ok sm" data-unblockdrv="${dr.id}">✅ تنشيط</button>`}
+      </div>
+    `).join('') : '<div class="card"><div class="empty">لا سائقين بعد</div></div>'}
+  `;
+  document.querySelectorAll('[data-blockdrv]').forEach((b) => b.onclick = async () => {
+    try {
+      await App.patch('/admin/drivers/' + b.dataset.blockdrv, { status: 'blocked' });
+      toast('أُوقف السائق', 'ok'); paintDrivers();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
+  document.querySelectorAll('[data-unblockdrv]').forEach((b) => b.onclick = async () => {
+    try {
+      await App.patch('/admin/drivers/' + b.dataset.unblockdrv, { status: 'active' });
+      toast('نُشّط السائق ✅', 'ok'); paintDrivers();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
+}
+
+/* ---------------- كل الطلبات ---------------- */
+
+async function paintOrders() {
+  const d = await App.get('/orders');
+  el('tab-orders').innerHTML = `
+    <div class="section-title">🧾 كل الطلبات <span class="count">${d.orders.length}</span></div>
+    ${d.orders.length ? d.orders.map((o) => `
+      <div class="card order-card">
+        <div class="oc-top">
+          <span class="oc-code">طلب #${o.code} • ${App.dt(o.createdAt)}</span>
+          ${chip(o.status)}
+        </div>
+        <div class="oc-shop">${o.shopIcon} ${escapeHtml(o.shopName)} → 🧍 ${escapeHtml(o.customerName)} (${escapeHtml(o.customerPhone)})</div>
+        <div class="oc-items">${o.items.map((i) => i.emoji + ' ' + escapeHtml(i.name) + ' ×' + i.qty).join(' • ')}</div>
+        <div class="oc-items">📍 ${escapeHtml(o.address)} ${o.driverName ? ' • 🛵 ' + escapeHtml(o.driverName) : ''}</div>
+        <div class="oc-foot">
+          <span class="muted small">عمولة المنصة: ${App.fmt(o.platformCommission || 0.2)}</span>
+          <span class="oc-total">${App.fmt(o.total)}</span>
+        </div>
+      </div>
+    `).join('') : '<div class="card"><div class="empty" style="padding:14px">لا طلبات بعد</div></div>'}
+  `;
+}
+
+/* ---------------- الإعلانات ---------------- */
+
+async function paintAds() {
+  const d = await App.get('/admin/ads');
+  el('tab-ads').innerHTML = `
+    <div class="section-title">📣 المساحات الإعلانية</div>
+    <div class="card">
+      <p class="muted small" style="margin-bottom:10px">تظهر الإعلانات النشطة في الصفحة الرئيسية لجميع الزبائن — مصدر دخل إضافي للتطبيق.</p>
+      <div class="field"><label>عنوان الإعلان</label><input class="input" id="ad-title" placeholder="مثال: 🥩 عروض لحوم أبو عمر"></div>
+      <div class="field"><label>نص الإعلان</label><input class="input" id="ad-body" placeholder="مثال: خصم 10% هذا الأسبوع على كل الطلبات"></div>
+      <button class="btn block" id="btn-add-ad">➕ نشر الإعلان</button>
+    </div>
+    ${d.ads.map((a) => `
+      <div class="card mng-row">
+        <div class="icon">📣</div>
+        <div class="flex1">
+          <h4>${escapeHtml(a.title)} ${a.active ? '<span class="chip ok">معروض</span>' : '<span class="chip gray">متوقف</span>'}</h4>
+          <div class="sub">${escapeHtml(a.body)}</div>
+        </div>
+        <button class="btn ${a.active ? 'warn' : 'ok'} sm" data-ad-toggle="${a.id}" data-active="${a.active}">${a.active ? 'إيقاف' : 'عرض'}</button>
+        <button class="btn bad sm" data-ad-del="${a.id}">🗑</button>
+      </div>
+    `).join('') || ''}
+  `;
+  el('btn-add-ad').onclick = async () => {
+    const title = el('ad-title').value.trim();
+    const body = el('ad-body').value.trim();
+    if (!title || !body) return toast('اكتب عنواناً ونصاً للإعلان', 'bad');
+    try {
+      await App.post('/admin/ads', { title, body });
+      toast('نُشر الإعلان 📣', 'ok');
+      paintAds();
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+  document.querySelectorAll('[data-ad-toggle]').forEach((b) => b.onclick = async () => {
+    try {
+      await App.patch('/admin/ads/' + b.dataset.adToggle, { active: b.dataset.active !== 'true' });
+      paintAds();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
+  document.querySelectorAll('[data-ad-del]').forEach((b) => b.onclick = async () => {
+    if (!confirm('حذف الإعلان نهائياً؟')) return;
+    try {
+      await App.del('/admin/ads/' + b.dataset.adDel);
+      toast('حُذف الإعلان', 'ok');
+      paintAds();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
+}
+
+/* ---------------- التهيئة ---------------- */
+
+function renderDash() {
+  el('view-login').style.display = 'none';
+  el('view-dash').style.display = '';
+  el('btn-logout').style.display = '';
+  switchTab(currentTab);
+  setPoll(refreshTab, 8000);
+}
+
+el('btn-login').onclick = doLogin;
+el('in-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+el('btn-logout').onclick = logout;
+el('btn-reset').onclick = async () => {
+  if (!confirm('سيتم حذف جميع البيانات وإعادة البيانات التجريبية. متابعة؟')) return;
+  const p = prompt('أدخل كلمة مرور الإدارة للتأكيد:');
+  if (p == null) return;
+  try {
+    await App.post('/admin/reset', { password: p });
+    toast('أُعيد تعيين البيانات ♻️', 'ok');
+    renderDash();
+  } catch (e) { toast(e.message, 'bad'); }
+};
+
+document.querySelectorAll('#admin-tabs button').forEach((b) => {
+  b.onclick = () => switchTab(b.dataset.tab);
+});
+
+if (adminOk) renderDash(); else renderLogin();

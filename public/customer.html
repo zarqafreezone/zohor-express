@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الزبون — الزهور اكسبرس</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🛍️%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo">🌸</div>
+    <div class="titles">
+      <h1 id="hdr-title">الزهور اكسبرس</h1>
+      <div class="sub" id="hdr-sub">مرحباً بك 👋</div>
+    </div>
+    <a class="hdr-btn" href="/" style="text-decoration:none">الرئيسية</a>
+  </header>
+
+  <!-- تسجيل الدخول / الترحيب -->
+  <div class="container" id="view-login" style="display:none">
+    <div class="login-hero">
+      <div class="big">🛍️</div>
+      <h2>أهلاً في الزهور اكسبرس</h2>
+      <p>سجّل بياناتك مرة واحدة واطلب من محلات جبل الزهور</p>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label>الاسم</label>
+        <input class="input" id="in-name" placeholder="مثال: أحمد محمد">
+      </div>
+      <div class="field">
+        <label>رقم الجوال</label>
+        <input class="input" id="in-phone" type="tel" inputmode="numeric" placeholder="07xxxxxxxx" maxlength="10">
+      </div>
+      <div class="field">
+        <label>عنوان التوصيل (داخل جبل الزهور)</label>
+        <input class="input" id="in-address" placeholder="مثال: جبل الزهور — شارع المسجد — بناية 12">
+      </div>
+      <button class="btn block" id="btn-login">ابدأ الطلب 🌸</button>
+    </div>
+  </div>
+
+  <!-- الرئيسية: المحلات -->
+  <div class="container" id="view-home" style="display:none">
+    <div id="ads-strip"></div>
+    <div class="section-title">🏪 محلات المنطقة <span class="count" id="shops-count">0</span></div>
+    <div class="tabs" id="cat-tabs" style="margin-top:0"></div>
+    <div class="shops-grid" id="shops-grid"></div>
+  </div>
+
+  <!-- صفحة المحل والمنتجات -->
+  <div class="container" id="view-shop" style="display:none"></div>
+
+  <!-- طلباتي -->
+  <div class="container" id="view-orders" style="display:none"></div>
+
+  <!-- متابعة طلب -->
+  <div class="container" id="view-track" style="display:none"></div>
+
+  <!-- حسابي -->
+  <div class="container" id="view-account" style="display:none"></div>
+
+  <!-- شريط السلة -->
+  <div id="cart-bar-wrap"></div>
+
+  <!-- شريط التنقل -->
+  <nav class="bottom-nav" id="nav">
+    <div class="inner">
+      <a href="#" data-view="home" class="active"><span class="ic">🏪</span>المحلات<span class="bubble" id="orders-bubble" style="display:none">0</span></a>
+      <a href="#" data-view="orders"><span class="ic">🧾</span>طلباتي</a>
+      <a href="#" data-view="account"><span class="ic">👤</span>حسابي</a>
+    </div>
+  </nav>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/customer.js"></script>
+</body>
+</html>

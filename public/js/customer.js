@@ -1,0 +1,544 @@
+/* ============================================================
+   الزهور اكسبرس — واجهة الزبون
+   ============================================================ */
+'use strict';
+
+let me = App.load('customer') || null;            // بيانات الزبون
+let cart = App.loadLocal('cart') || {};           // {shopId: {productId: qty}}
+let currentShop = null;                           // المحل المفتوح حالياً
+let trackOrderId = null;
+let allShops = [];                                // كل المحلات
+let activeCat = 'الكل';                           // التصنيف المختار
+let adsList = [];                                 // الإعلانات النشطة
+let adIndex = 0;
+let adTimer = null;
+
+/* ---------------- التنقل بين الشاشات ---------------- */
+
+const views = ['login', 'home', 'shop', 'orders', 'track', 'account'];
+
+function show(view) {
+  stopPoll();
+  if (adTimer) { clearInterval(adTimer); adTimer = null; }
+  views.forEach((v) => {
+    const el = document.getElementById('view-' + v);
+    if (el) el.style.display = (v === view) ? '' : 'none';
+  });
+  document.getElementById('cart-bar-wrap').innerHTML = '';
+  document.querySelectorAll('#nav a').forEach((a) => {
+    a.classList.toggle('active', a.dataset.view === view);
+  });
+  window.scrollTo(0, 0);
+}
+
+/* ---------------- شاشة الدخول ---------------- */
+
+function renderLogin() {
+  show('login');
+  if (me) {
+    document.getElementById('in-name').value = me.name || '';
+    document.getElementById('in-phone').value = me.phone || '';
+    document.getElementById('in-address').value = me.address || '';
+  }
+}
+
+async function doLogin() {
+  const name = document.getElementById('in-name').value.trim();
+  const phone = document.getElementById('in-phone').value.trim();
+  const address = document.getElementById('in-address').value.trim();
+  if (name.length < 2) return toast('اكتب اسمك أولاً 🙂', 'bad');
+  if (!/^07\d{8}$/.test(phone)) return toast('رقم الجوال يجب أن يبدأ بـ 07 (10 أرقام)', 'bad');
+  if (!address) return toast('اكتب عنوان التوصيل', 'bad');
+  try {
+    const d = await App.post('/customers/login', { name, phone, address });
+    me = d.customer;
+    App.save('customer', me);
+    renderHome();
+    toast('أهلاً ' + me.name + ' 🌸', 'ok');
+  } catch (e) { toast(e.message, 'bad'); }
+}
+
+/* ---------------- الإعلانات (مساحات إعلانية) ---------------- */
+
+async function renderAds() {
+  const wrap = document.getElementById('ads-strip');
+  try {
+    const d = await App.get('/ads');
+    adsList = d.ads || [];
+  } catch { adsList = []; }
+  if (!adsList.length) { wrap.innerHTML = ''; return; }
+  adIndex = 0;
+  paintAd();
+  if (adTimer) clearInterval(adTimer);
+  adTimer = setInterval(() => {
+    if (!adsList.length) return;
+    adIndex = (adIndex + 1) % adsList.length;
+    paintAd();
+  }, 6000);
+}
+
+function paintAd() {
+  const wrap = document.getElementById('ads-strip');
+  if (!wrap || !adsList.length) return;
+  const a = adsList[adIndex % adsList.length];
+  wrap.innerHTML = `
+    <div class="ad-banner" onclick="nextAd()">
+      <span class="ad-tag">إعلان</span>
+      <div class="flex1">
+        <div class="ad-title">${escapeHtml(a.title)}</div>
+        <div class="ad-body">${escapeHtml(a.body)}</div>
+      </div>
+      <span class="ad-next">‹</span>
+    </div>`;
+}
+function nextAd() {
+  if (adsList.length < 2) return;
+  adIndex = (adIndex + 1) % adsList.length;
+  paintAd();
+}
+
+/* ---------------- قائمة المحلات + التصنيفات ---------------- */
+
+async function renderHome() {
+  show('home');
+  document.getElementById('hdr-title').textContent = 'الزهور اكسبرس';
+  document.getElementById('hdr-sub').textContent = 'أهلاً ' + (me ? me.name.split(' ')[0] : '') + ' 👋';
+  renderAds();
+  const grid = document.getElementById('shops-grid');
+  grid.innerHTML = '<div class="empty">جارٍ تحميل المحلات…</div>';
+  try {
+    const d = await App.get('/shops');
+    allShops = d.shops;
+    document.getElementById('shops-count').textContent = allShops.length;
+
+    // بناء تبويبات التصنيفات الموجودة فعلياً
+    const cats = ['الكل', ...new Set(allShops.map((s) => s.category))];
+    document.getElementById('cat-tabs').innerHTML = cats.map((c) =>
+      `<button class="${c === activeCat ? 'active' : ''}" onclick="setCat('${escapeHtml(c).replace(/'/g, "\\'")}')">${c}</button>`
+    ).join('');
+
+    paintShops();
+  } catch (e) {
+    grid.innerHTML = `<div class="empty">⚠️ ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function setCat(c) { activeCat = c; renderHome(); }
+
+function paintShops() {
+  const grid = document.getElementById('shops-grid');
+  const list = activeCat === 'الكل' ? allShops : allShops.filter((s) => s.category === activeCat);
+  if (!list.length) {
+    grid.innerHTML = '<div class="empty"><div class="e-icon">🏪</div><div class="e-title">لا توجد محلات في هذا التصنيف</div></div>';
+    return;
+  }
+  grid.innerHTML = list.map((s) => `
+    <div class="shop-card" onclick="openShop('${s.id}')">
+      <div class="row">
+        <div class="icon">${s.icon}</div>
+        <div class="flex1">
+          <h3>${escapeHtml(s.name)}</h3>
+          <div class="muted small">${escapeHtml(s.category)} • ${s.productCount} منتج • ⭐ ${s.rating}</div>
+        </div>
+        <div>${s.isOpen ? '<span class="badge-open">● مفتوح</span>' : '<span class="badge-closed">● مغلق</span>'}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ---------------- صفحة المحل ---------------- */
+
+function cartOf(shopId) { return cart[shopId] || {}; }
+function cartCount(shopId) { return Object.values(cartOf(shopId)).reduce((a, b) => a + b, 0); }
+function cartSubtotal(shopId) {
+  if (!currentShop || currentShop.id !== shopId) return 0;
+  return currentShop.products.reduce((sum, p) => sum + (cartOf(shopId)[p.id] || 0) * p.price, 0);
+}
+function persistCart() { App.saveLocal('cart', cart); }
+
+function changeQty(pid, delta) {
+  if (!currentShop) return;
+  const c = { ...cartOf(currentShop.id) };
+  const q = (c[pid] || 0) + delta;
+  if (q <= 0) delete c[pid]; else c[pid] = Math.min(99, q);
+  cart[currentShop.id] = c;
+  persistCart();
+  renderShopPage();
+}
+
+async function openShop(id) {
+  try {
+    const d = await App.get('/shops/' + id);
+    currentShop = d.shop;
+    renderShopPage();
+  } catch (e) { toast(e.message, 'bad'); }
+}
+
+function renderShopPage() {
+  const s = currentShop;
+  show('shop');
+  document.getElementById('hdr-title').textContent = s.icon + ' ' + s.name;
+  document.getElementById('hdr-sub').textContent = s.category + ' • ⭐ ' + s.rating;
+
+  const c = cartOf(s.id);
+  const count = cartCount(s.id);
+  const sub = cartSubtotal(s.id);
+
+  let html = `
+    <button class="btn ghost sm" onclick="renderHome()">← رجوع للمحلات</button>
+    <div style="height:10px"></div>
+    <div class="card">
+      <div class="row between">
+        <div>
+          <h3 style="font-size:16px">${s.icon} ${escapeHtml(s.name)}</h3>
+          <div class="muted small">${escapeHtml(s.category)} • ${s.products.length} منتج</div>
+        </div>
+        ${s.isOpen
+          ? '<span class="badge-open">● مفتوح للاستقبال</span>'
+          : '<span class="badge-closed">● مغلق حالياً</span>'}
+      </div>
+    </div>
+    <div class="card">
+  `;
+
+  if (!s.products.length) {
+    html += '<div class="empty"><div class="e-icon">📦</div><div class="e-title">لا توجد منتجات بعد</div></div>';
+  } else {
+    html += s.products.map((p) => {
+      const q = c[p.id] || 0;
+      return `
+        <div class="product-row" style="${p.available ? '' : 'opacity:.45'}">
+          <div class="p-emoji">${p.emoji}</div>
+          <div class="flex1">
+            <div class="p-name">${escapeHtml(p.name)} ${p.available ? '' : '<span class="chip gray">غير متوفر</span>'}</div>
+            <div class="p-unit">${escapeHtml(p.unit)}</div>
+          </div>
+          <div class="p-price">${App.fmt(p.price)}</div>
+          <div class="qty-ctl">
+            ${q > 0 ? `<button onclick="changeQty('${p.id}',-1)">−</button><span class="q">${q}</span>` : ''}
+            <button class="add" onclick="changeQty('${p.id}',1)" ${p.available && s.isOpen ? '' : 'disabled'}>+</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+  html += '</div>';
+
+  document.getElementById('view-shop').innerHTML = html;
+
+  const barWrap = document.getElementById('cart-bar-wrap');
+  if (count > 0 && s.isOpen) {
+    barWrap.innerHTML = `
+      <div class="cart-bar">
+        <div onclick="openCheckout()">
+          <span>🛒 ${count} صنف • ${App.fmt(sub)}</span>
+          <b>إتمام الطلب ←</b>
+        </div>
+      </div>`;
+  } else {
+    barWrap.innerHTML = '';
+  }
+}
+
+/* ---------------- إتمام الطلب ---------------- */
+
+function openCheckout() {
+  if (!me || !currentShop) return;
+  const count = cartCount(currentShop.id);
+  const sub = cartSubtotal(currentShop.id);
+  const fee = 0.5;
+  openSheet(`
+    <h3>🧾 إتمام الطلب — ${escapeHtml(currentShop.name)}</h3>
+    <div class="field">
+      <label>الاسم</label>
+      <input class="input" id="co-name" value="${escapeHtml(me.name)}">
+    </div>
+    <div class="field">
+      <label>رقم الجوال</label>
+      <input class="input" id="co-phone" value="${escapeHtml(me.phone)}" readonly style="background:#f1eefb">
+    </div>
+    <div class="field">
+      <label>عنوان التوصيل</label>
+      <input class="input" id="co-address" value="${escapeHtml(me.address)}" placeholder="الحي — الشارع — رقم البناية">
+    </div>
+    <div class="field">
+      <label>ملاحظات (اختياري)</label>
+      <textarea class="input" id="co-notes" placeholder="مثال: الخبز حَمص إذا سمحت 🙏"></textarea>
+    </div>
+    <div class="card" style="box-shadow:none; background:#faf8ff">
+      <div class="item-line"><span>مجموع الطلبية</span><span class="pr">${App.fmt(sub)}</span></div>
+      <div class="item-line"><span>رسوم التوصيل</span><span class="pr">${App.fmt(fee)}</span></div>
+      <div class="item-line grand" style="font-weight:800"><span>الإجمالي (نقداً عند الاستلام)</span><span class="pr" style="color:var(--v1)">${App.fmt(sub + fee)}</span></div>
+    </div>
+    <button class="btn ok block" id="btn-place">✅ تأكيد الطلب</button>
+    <div style="height:6px"></div>
+    <button class="btn ghost block" onclick="closeSheet()">إلغاء</button>
+  `);
+
+  document.getElementById('btn-place').onclick = async () => {
+    const name = document.getElementById('co-name').value.trim();
+    const address = document.getElementById('co-address').value.trim();
+    const notes = document.getElementById('co-notes').value.trim();
+    if (!address) return toast('العنوان مطلوب', 'bad');
+    const btn = document.getElementById('btn-place');
+    btn.disabled = true;
+    btn.textContent = 'جارٍ إرسال الطلب…';
+    try {
+      const items = Object.entries(cartOf(currentShop.id)).map(([productId, qty]) => ({ productId, qty }));
+      const d = await App.post('/orders', {
+        shopId: currentShop.id,
+        customer: { id: me.id, name, phone: me.phone, address },
+        items, notes,
+      });
+      me = { ...me, name, address };
+      App.save('customer', me);
+      delete cart[currentShop.id];
+      persistCart();
+      closeSheet();
+      toast('أُرسل طلبك بنجاح 🌸', 'ok');
+      openTrack(d.order.id);
+    } catch (e) {
+      toast(e.message, 'bad');
+      btn.disabled = false;
+      btn.textContent = '✅ تأكيد الطلب';
+    }
+  };
+}
+
+/* ---------------- طلباتي ---------------- */
+
+async function refreshBubble() {
+  if (!me) return;
+  try {
+    const d = await App.get('/orders?customer=' + me.phone + '&active=1');
+    const bubble = document.getElementById('orders-bubble');
+    bubble.textContent = d.orders.length;
+    bubble.style.display = d.orders.length ? '' : 'none';
+  } catch { /* تجاهل */ }
+}
+
+async function renderOrders() {
+  show('orders');
+  document.getElementById('hdr-title').textContent = 'الزهور اكسبرس';
+  document.getElementById('hdr-sub').textContent = 'طلباتي';
+  const el = document.getElementById('view-orders');
+  if (!me) return renderLogin();
+  el.innerHTML = '<div class="empty">جارٍ التحميل…</div>';
+  try {
+    const d = await App.get('/orders?customer=' + me.phone);
+    const active = d.orders.filter((o) => !['delivered', 'rejected', 'cancelled'].includes(o.status));
+    const bubble = document.getElementById('orders-bubble');
+    bubble.style.display = active.length ? '' : 'none';
+    bubble.textContent = active.length;
+
+    if (!d.orders.length) {
+      el.innerHTML = `
+        <div class="empty">
+          <div class="e-icon">🧾</div>
+          <div class="e-title">لا توجد طلبات بعد</div>
+          تصفح المحلات واطلب أول طلبية 🌸
+          <div style="margin-top:14px"><button class="btn" onclick="renderHome()">تصفح المحلات</button></div>
+        </div>`;
+      return;
+    }
+    el.innerHTML = d.orders.map((o) => `
+      <div class="card order-card" onclick="openTrack('${o.id}')">
+        <div class="oc-top">
+          <span class="oc-code">طلب #${o.code}</span>
+          ${chip(o.status)}
+        </div>
+        <div class="oc-shop">${o.shopIcon} ${escapeHtml(o.shopName)}</div>
+        <div class="oc-items">${o.items.map((i) => i.emoji + ' ' + escapeHtml(i.name) + ' ×' + i.qty).join(' • ')}</div>
+        <div class="oc-foot">
+          <span class="muted small">🕐 ${App.dt(o.createdAt)}</span>
+          <span class="oc-total">${App.fmt(o.total)}</span>
+        </div>
+      </div>
+    `).join('');
+    setPoll(() => { renderOrdersSilently(); }, 5000);
+  } catch (e) {
+    el.innerHTML = `<div class="empty">⚠️ ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function renderOrdersSilently() {
+  if (document.getElementById('view-orders').style.display === 'none') return;
+  try {
+    const d = await App.get('/orders?customer=' + me.phone);
+    el_update(d.orders);
+  } catch { /* تجاهل */ }
+}
+
+function el_update(orders) {
+  const el = document.getElementById('view-orders');
+  const active = orders.filter((o) => !['delivered', 'rejected', 'cancelled'].includes(o.status));
+  const bubble = document.getElementById('orders-bubble');
+  bubble.style.display = active.length ? '' : 'none';
+  bubble.textContent = active.length;
+  el.innerHTML = orders.map((o) => `
+    <div class="card order-card" onclick="openTrack('${o.id}')">
+      <div class="oc-top">
+        <span class="oc-code">طلب #${o.code}</span>
+        ${chip(o.status)}
+      </div>
+      <div class="oc-shop">${o.shopIcon} ${escapeHtml(o.shopName)}</div>
+      <div class="oc-items">${o.items.map((i) => i.emoji + ' ' + escapeHtml(i.name) + ' ×' + i.qty).join(' • ')}</div>
+      <div class="oc-foot">
+        <span class="muted small">🕐 ${App.dt(o.createdAt)}</span>
+        <span class="oc-total">${App.fmt(o.total)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ---------------- متابعة الطلب ---------------- */
+
+async function openTrack(id) {
+  trackOrderId = id;
+  show('track');
+  await renderTrack();
+  setPoll(renderTrack, 3000);
+}
+
+async function renderTrack() {
+  const el = document.getElementById('view-track');
+  try {
+    const d = await App.get('/orders/' + trackOrderId);
+    const o = d.order;
+    document.getElementById('hdr-title').textContent = 'طلب #' + o.code;
+    document.getElementById('hdr-sub').textContent = STATUS[o.status].label;
+
+    const doneKeys = { pending: ['created'], accepted: ['created', 'accepted'], ready: ['created', 'accepted', 'ready'], assigned: ['created', 'accepted', 'ready', 'assigned'], picked_up: ['created', 'accepted', 'ready', 'assigned', 'picked_up'], delivered: ['created', 'accepted', 'ready', 'assigned', 'picked_up', 'delivered'] };
+    const flow = doneKeys[o.status] || ['created'];
+    const badState = ['rejected', 'cancelled'].includes(o.status);
+
+    const steps = o.timeline.map((t) => {
+      let cls = '';
+      if (badState) cls = (t.key === o.status) ? 'bad' : 'done';
+      else if (t.key === o.status) cls = 'now';
+      else cls = flow.includes(t.key) ? 'done' : '';
+      return `
+        <div class="t-step ${cls}">
+          <div class="dot">${cls === 'now' ? '⏺' : cls === 'done' ? '✓' : ''}</div>
+          <div>
+            <div class="t-lbl">${escapeHtml(t.label)}</div>
+            <div class="t-time">${App.dt(t.at)}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const canCancel = ['pending', 'accepted'].includes(o.status);
+
+    el.innerHTML = `
+      <button class="btn ghost sm" onclick="renderOrders()">← رجوع لطلباتي</button>
+      <div style="height:10px"></div>
+      <div class="card">
+        <div class="row between" style="margin-bottom:6px">
+          <h3>${o.shopIcon} ${escapeHtml(o.shopName)}</h3>
+          ${chip(o.status)}
+        </div>
+        ${o.driverName ? `<div class="muted small" style="margin-bottom:4px">🛵 السائق: <b>${escapeHtml(o.driverName)}</b></div>` : ''}
+        <div class="muted small">📍 ${escapeHtml(o.address)}</div>
+        ${o.notes ? `<div class="muted small">📝 ${escapeHtml(o.notes)}</div>` : ''}
+      </div>
+
+      <div class="card">
+        <div class="section-title" style="margin-top:0">🚚 حالة الطلب</div>
+        <div class="timeline">${steps}</div>
+        ${canCancel ? `<button class="btn bad block sm" style="margin-top:10px" id="btn-cancel">إلغاء الطلب</button>` : ''}
+      </div>
+
+      <div class="card">
+        <div class="section-title" style="margin-top:0">🧾 تفاصيل الطلبية</div>
+        ${o.items.map((i) => `
+          <div class="item-line">
+            <span class="nm">${i.emoji} ${escapeHtml(i.name)} <span class="muted small">(${escapeHtml(i.unit)}) ×${i.qty}</span></span>
+            <span class="pr">${App.fmt(i.price * i.qty)}</span>
+          </div>`).join('')}
+        <div class="totals-box">
+          <div class="item-line"><span>المجموع</span><span class="pr">${App.fmt(o.subtotal)}</span></div>
+          <div class="item-line"><span>التوصيل</span><span class="pr">${App.fmt(o.deliveryFee)}</span></div>
+          <div class="item-line grand"><span><b>الإجمالي</b> <span class="muted small">(${escapeHtml(o.payment)})</span></span><span class="pr"><b>${App.fmt(o.total)}</b></span></div>
+        </div>
+      </div>
+    `;
+
+    const cancelBtn = document.getElementById('btn-cancel');
+    if (cancelBtn) {
+      cancelBtn.onclick = async () => {
+        if (!confirm('هل أنت متأكد من إلغاء الطلب؟')) return;
+        try {
+          await App.patch('/orders/' + o.id, { action: 'cancel' });
+          toast('أُلغي الطلب', 'ok');
+          renderTrack();
+        } catch (e) { toast(e.message, 'bad'); }
+      };
+    }
+  } catch (e) {
+    el.innerHTML = `<div class="empty">⚠️ ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+/* ---------------- حسابي ---------------- */
+
+function renderAccount() {
+  show('account');
+  document.getElementById('hdr-title').textContent = 'الزهور اكسبرس';
+  document.getElementById('hdr-sub').textContent = 'حسابي';
+  const el = document.getElementById('view-account');
+  el.innerHTML = `
+    <div class="login-hero">
+      <div class="big">👤</div>
+      <h2>${escapeHtml(me.name)}</h2>
+      <p>📱 ${escapeHtml(me.phone)}</p>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label>الاسم</label>
+        <input class="input" id="ac-name" value="${escapeHtml(me.name)}">
+      </div>
+      <div class="field">
+        <label>عنوان التوصيل</label>
+        <input class="input" id="ac-address" value="${escapeHtml(me.address)}">
+      </div>
+      <button class="btn block" id="ac-save">حفظ التعديلات</button>
+    </div>
+    <button class="btn ghost block" id="ac-logout">🚪 تسجيل الخروج</button>
+  `;
+  document.getElementById('ac-save').onclick = async () => {
+    const name = document.getElementById('ac-name').value.trim();
+    const address = document.getElementById('ac-address').value.trim();
+    if (name.length < 2 || !address) return toast('تحقق من الاسم والعنوان', 'bad');
+    try {
+      const d = await App.post('/customers/login', { name, phone: me.phone, address });
+      me = d.customer;
+      App.save('customer', me);
+      toast('تم الحفظ ✅', 'ok');
+      renderAccount();
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+  document.getElementById('ac-logout').onclick = () => {
+    App.clear('customer');
+    me = null;
+    renderLogin();
+  };
+}
+
+/* ---------------- التهيئة ---------------- */
+
+document.querySelectorAll('#nav a').forEach((a) => {
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    const v = a.dataset.view;
+    if (v === 'home') renderHome();
+    else if (v === 'orders') renderOrders();
+    else if (v === 'account') renderAccount();
+  });
+});
+
+if (me) {
+  renderHome();
+  refreshBubble();
+} else {
+  renderLogin();
+}

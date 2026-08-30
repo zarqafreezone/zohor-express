@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الإدارة — الزهور اكسبرس</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🛠️%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="wide">
+  <header class="app-header">
+    <div class="logo">🛠️</div>
+    <div class="titles">
+      <h1>الزهور اكسبرس — الإدارة</h1>
+      <div class="sub">لوحة تحكم مالك التطبيق</div>
+    </div>
+    <a class="hdr-btn" href="/" style="text-decoration:none">الرئيسية</a>
+    <button class="hdr-btn" id="btn-logout" style="display:none">خروج</button>
+  </header>
+
+  <!-- تسجيل الدخول -->
+  <div class="container" id="view-login" style="display:none">
+    <div class="login-hero">
+      <div class="big">🔐</div>
+      <h2>دخول المشرف</h2>
+      <p>أدخل كلمة مرور الإدارة للوصول إلى لوحة التحكم</p>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label>كلمة المرور</label>
+        <input class="input" id="in-pass" type="password" placeholder="••••••••">
+      </div>
+      <button class="btn block" id="btn-login">دخول</button>
+      <p class="muted small" style="margin-top:10px">💡 كلمة المرور التجريبية: <b>admin123</b></p>
+    </div>
+  </div>
+
+  <!-- اللوحة -->
+  <div class="container" id="view-dash" style="display:none">
+    <div class="tabs" id="admin-tabs">
+      <button data-tab="overview" class="active">📊 نظرة عامة</button>
+      <button data-tab="shops">🏪 البقالات</button>
+      <button data-tab="drivers">🛵 السائقون</button>
+      <button data-tab="orders">🧾 الطلبات</button>
+      <button data-tab="ads">📣 الإعلانات</button>
+    </div>
+
+    <div id="tab-overview"></div>
+    <div id="tab-shops" style="display:none"></div>
+    <div id="tab-drivers" style="display:none"></div>
+    <div id="tab-orders" style="display:none"></div>
+    <div id="tab-ads" style="display:none"></div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="font-size:15px; margin-bottom:8px">⚙️ منطقة تجريبية</h3>
+      <p class="muted small" style="margin-bottom:10px">إعادة تعيين البيانات تحذف كل الطلبات والمحلات المضافة وتعيد البيانات التجريبية الأصلية.</p>
+      <button class="btn bad sm" id="btn-reset">♻️ إعادة تعيين بيانات التجربة</button>
+    </div>
+  </div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

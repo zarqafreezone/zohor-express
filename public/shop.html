@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>البقالة / المحل — الزهور اكسبرس</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🏪%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo" id="hdr-logo">🏪</div>
+    <div class="titles">
+      <h1 id="hdr-title">الزهور اكسبرس</h1>
+      <div class="sub" id="hdr-sub">لوحة البقالة / المحل</div>
+    </div>
+    <a class="hdr-btn" href="/" style="text-decoration:none">الرئيسية</a>
+  </header>
+
+  <!-- اختيار البقالة / تسجيل -->
+  <div class="container" id="view-login" style="display:none">
+    <div class="login-hero">
+      <div class="big">🏪</div>
+      <h2>دخول البقالات والمحلات</h2>
+      <p>اختر محلك للدخول (وضع تجريبي) أو سجّل محلك الجديد</p>
+    </div>
+    <div class="card" id="shops-list"></div>
+    <button class="btn ghost block" id="btn-toggle-register">➕ تسجيل محل جديد</button>
+
+    <div class="card" id="register-card" style="display:none; margin-top:12px">
+      <h3 style="margin-bottom:10px">📝 تسجيل محل جديد</h3>
+      <div class="field"><label>اسم المحل</label><input class="input" id="rg-name" placeholder="مثال: بقالة الصفا"></div>
+      <div class="field"><label>اسم المالك</label><input class="input" id="rg-owner" placeholder="مثال: أبو سامر"></div>
+      <div class="field"><label>جوال المالك</label><input class="input" id="rg-phone" type="tel" inputmode="numeric" placeholder="07xxxxxxxx" maxlength="10"></div>
+      <div class="field"><label>نوع النشاط</label>
+        <select class="input" id="rg-category"></select>
+      </div>
+      <button class="btn block" id="btn-register">إرسال طلب التسجيل</button>
+      <div class="card" style="box-shadow:none; background:#faf8ff; margin:10px 0 0">
+        <div class="item-line"><span>📅 اشتراك شهري</span><span class="pr">10.00 د.أ</span></div>
+        <div class="item-line"><span>🪙 عمولة على كل طلب</span><span class="pr">20 قرش</span></div>
+        <div class="item-line"><span>📣 مساحات إعلانية للترويج لعروضك</span><span class="pr">✓</span></div>
+      </div>
+      <p class="muted small" style="margin-top:8px">⏳ سيتم تنشيط المحل بعد موافقة إدارة التطبيق</p>
+    </div>
+  </div>
+
+  <!-- لوحة المحل -->
+  <div class="container" id="view-dash" style="display:none">
+    <div class="card row between" id="sub-card">
+      <div>
+        <h4 style="font-size:14px">📅 حالة الاشتراك</h4>
+        <div class="muted small" id="sub-lbl">—</div>
+      </div>
+      <span class="chip vio" id="sub-chip">—</span>
+    </div>
+
+    <div class="grid3" style="margin-bottom:12px">
+      <div class="stat"><div class="num" id="st-today">0</div><div class="lbl">طلبات اليوم</div></div>
+      <div class="stat"><div class="num" id="st-revenue">0.00</div><div class="lbl">مبيعات اليوم</div></div>
+      <div class="stat"><div class="num" id="st-comm">0.00</div><div class="lbl">عمولة المنصة</div></div>
+    </div>
+
+    <div class="card row between">
+      <div>
+        <h4 style="font-size:14.5px">استقبال الطلبات</h4>
+        <div class="muted small" id="open-lbl">—</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="sw-open">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="tabs" id="dash-tabs">
+      <button data-tab="orders" class="active">🧾 الطلبات</button>
+      <button data-tab="products">📦 المنتجات</button>
+    </div>
+
+    <div id="tab-orders"></div>
+    <div id="tab-products" style="display:none"></div>
+  </div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/shop.js"></script>
+</body>
+</html>
