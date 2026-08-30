@@ -122,3 +122,31 @@ function setPoll(fn, ms) {
   _pollTimer = setInterval(fn, ms || 4000);
 }
 function stopPoll() { clearInterval(_pollTimer); _pollTimer = null; }
+
+// ضغط صورة من الجوال وتحويلها إلى Data URL (لرفع المستندات)
+function fileToDataUrl(file, maxSize, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('تعذر قراءة الصورة'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('صورة غير صالحة'));
+      img.onload = () => {
+        try {
+          const max = maxSize || 700;
+          let w = img.width, h = img.height;
+          if (w > max || h > max) {
+            const r = Math.min(max / w, max / h);
+            w = Math.round(w * r); h = Math.round(h * r);
+          }
+          const cv = document.createElement('canvas');
+          cv.width = w; cv.height = h;
+          cv.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(cv.toDataURL('image/jpeg', quality || 0.6));
+        } catch (e) { reject(e); }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}

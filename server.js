@@ -1,7 +1,7 @@
 /* ============================================================
    الزهور اكسبرس — خادم بدون أي اعتماديات خارجية (Node.js خالص)
    يقدّم: REST API + الملفات الثابتة (الواجهات)
-   نموذج الإيرادات: اشتراك شهري 10 دنانير من البقالات
+   نموذج الإيرادات: اشتراك شهري 10 دنانير من المحلات
                     + 20 قرش عمولة على كل طلب + مساحات إعلانية
    ============================================================ */
 'use strict';
@@ -28,7 +28,7 @@ const CATEGORIES = [
   'اجهزة كهربائية والكترونيات',
   'صيانة ومقاولات',
   'دراي كلين',
-  'محلات فلترة المياه',
+  'مياه شرب',
   'أخرى',
 ];
 
@@ -45,7 +45,7 @@ const CATEGORY_ICONS = {
   'أخرى': '📦',
 };
 
-const SUBSCRIPTION_FEE = 10;   // دينار شهرياً من البقالة
+const SUBSCRIPTION_FEE = 10;   // دينار شهرياً من المحل
 const ORDER_COMMISSION = 0.2;  // 20 قرش على كل طلب
 const TRIAL_DAYS = 14;         // فترة تجريبية مجانية للمحل الجديد
 const SEED_SHOP_PASSWORD = '1234'; // كلمة المرور الافتراضية للمحلات التجريبية
@@ -61,7 +61,7 @@ const CATEGORY_IMAGES = {
   'اجهزة كهربائية والكترونيات': '/img/shops/electronics.jpg',
   'صيانة ومقاولات': '/img/shops/maintenance.jpg',
   'دراي كلين': '/img/shops/dryclean.jpg',
-  'محلات فلترة المياه': '/img/shops/water.jpg',
+  'مياه شرب': '/img/shops/water.jpg',
   'أخرى': '/img/shops/spices.jpg',
 };
 
@@ -75,6 +75,11 @@ function normPhone(raw) {
   return p;
 }
 const validPhone = (p) => /^07\d{8}$/.test(p);
+
+/* بناء نص العنوان التفصيلي من مكوناته */
+function buildAddress(c) {
+  return [c.area, c.street, c.building, c.landmark].filter(Boolean).join(' — ');
+}
 
 /* ---------------- قاعدة البيانات (ملف JSON) ---------------- */
 
@@ -248,7 +253,7 @@ function seedDb() {
       },
       {
         id: 's' + nid(), name: 'فلترة المياه الزهور', owner: 'فادي الطرحيني', phone: '0790000012',
-        category: 'محلات فلترة المياه', icon: '💧', rating: 4.7, status: 'active', isOpen: true,
+        category: 'مياه شرب', icon: '💧', rating: 4.7, status: 'active', isOpen: true,
         subscriptionUntil: now + 14 * DAY, createdAt: now,
         products: [
           P('فلتر مياه منزلي 5 مراحل', 25.0, 'حبة', '🫗', 30.0),
@@ -269,7 +274,9 @@ function seedDb() {
     drivers: [
       {
         id: 'd' + nid(), name: 'أبو يزن', phone: '0790000099',
-        status: 'active', online: false, deliveries: 27, earnings: 13.5, createdAt: now,
+        status: 'active', docsSubmitted: true, idImage: null, licenseImage: null,
+        phone2: '', address: '',
+        online: false, deliveries: 27, earnings: 13.5, createdAt: now,
       },
     ],
     ads: [
@@ -277,7 +284,7 @@ function seedDb() {
         id: 'a' + nid(), title: '🥩 عرض أبو عمر للحوم', body: 'خصم 10% على الطلبات فوق 10 دنانير هذا الأسبوع', active: true,
       },
       {
-        id: 'a' + nid(), title: '🌸 انشر بقالتك معنا', body: 'اشتراك 10 دنانير شهرياً + 20 قرش على الطلب — تواصل مع الإدارة', active: true,
+        id: 'a' + nid(), title: '🌸 انشر محلك معنا', body: 'اشتراك 10 دنانير شهرياً + 20 قرش على الطلب — تواصل مع الإدارة', active: true,
       },
     ],
     orders: [],
@@ -344,12 +351,12 @@ function findOrder(id) { return db.orders.find((o) => o.id === id); }
 
 const TIMELINE_LABELS = {
   created: 'أُرسل الطلب',
-  accepted: 'قبلت البقالة الطلب',
+  accepted: 'قبل المحل الطلب',
   ready: 'الطلب جاهز للاستلام',
-  assigned: 'السائق في طريقه للبقالة',
+  assigned: 'السائق في طريقه للمحل',
   picked_up: 'السائق استلم الطلب',
   delivered: 'تم التوصيل بنجاح ✅',
-  rejected: 'رفضت البقالة الطلب',
+  rejected: 'رفض المحل الطلب',
   cancelled: 'أُلغي الطلب',
 };
 
@@ -392,34 +399,45 @@ async function handleApi(req, res, pathname, url) {
 
   /* ---------- الزبون ---------- */
   } else if (m === 'POST' && pathname === '/api/customers/login') {
-    const { name, phone, address } = body;
+    const { name, phone, phone2, area, street, building, landmark } = body;
     const norm = normPhone(phone);
     if (!validPhone(norm)) return bad(res, 'رقم الجوال غير صحيح — مثال صحيح: 0791234567');
+    const p2 = phone2 ? normPhone(phone2) : '';
     let c = db.customers.find((x) => x.phone === norm);
     if (!c) {
-      c = { id: nextId('c'), name: name || 'زبون', phone: norm, address: address || '', createdAt: Date.now() };
+      c = { id: nextId('c'), name: name || 'زبون', phone: norm, phone2: p2,
+        area: area || '', street: street || '', building: building || '', landmark: landmark || '',
+        address: '', createdAt: Date.now() };
       db.customers.push(c);
     } else {
       if (name) c.name = name;
-      if (address) c.address = address;
+      if (phone2 !== undefined) c.phone2 = p2;
+      if (area !== undefined) c.area = area;
+      if (street !== undefined) c.street = street;
+      if (building !== undefined) c.building = building;
+      if (landmark !== undefined) c.landmark = landmark;
     }
+    c.address = buildAddress(c);
     saveDb();
     return json(res, 200, { customer: c });
 
-  /* ---------- البقالات ---------- */
+  /* ---------- المحلات ---------- */
   } else if (m === 'GET' && pathname === '/api/categories') {
     return json(res, 200, { categories: CATEGORIES, icons: CATEGORY_ICONS });
 
   } else if (m === 'GET' && pathname === '/api/shops') {
     const all = q('all') === '1';
     // للزبائن: المحلات الفعّالة فقط + اشتراكها ساري (أو فترة تجريبية)
+    // مع all=1 (لصفحة دخول المحلات والإدارة): تُضاف بيانات التواصل والعنوان
     const shops = db.shops
       .filter((s) => all || (s.status === 'active' && subActive(s)))
-      .map(publicShop);
+      .map((s) => all
+        ? { ...publicShop(s), ownerPhone: s.phone, phone2: s.phone2 || '', address: s.address || '' }
+        : publicShop(s));
     return json(res, 200, { shops });
 
   } else if (m === 'POST' && pathname === '/api/shops/register') {
-    const { name, owner, phone, category } = body;
+    const { name, owner, phone, category, phone2, area, street, landmark } = body;
     if (!name || !owner || !phone) return bad(res, 'يرجى تعبئة جميع الحقول');
     const norm = normPhone(phone);
     if (!validPhone(norm)) return bad(res, 'رقم الجوال غير صحيح — مثال صحيح: 0791234567');
@@ -435,6 +453,8 @@ async function handleApi(req, res, pathname, url) {
       subscriptionUntil: Date.now() + TRIAL_DAYS * 86400000,
       trial: true,
       password,
+      phone2: phone2 ? normPhone(phone2) : '',
+      address: [area, street, landmark].filter(Boolean).join(' — '),
       createdAt: Date.now(), products: [],
     };
     db.shops.push(shop);
@@ -464,7 +484,7 @@ async function handleApi(req, res, pathname, url) {
 
   } else if (parts[1] === 'shops' && parts[2] && !parts[3]) {
     const shop = findShop(parts[2]);
-    if (!shop) return bad(res, 'البقالة غير موجودة', 404);
+    if (!shop) return bad(res, 'المحل غير موجود', 404);
     if (m === 'GET') return json(res, 200, { shop });
     if (m === 'PATCH') {
       if (typeof body.isOpen === 'boolean') shop.isOpen = body.isOpen;
@@ -475,7 +495,7 @@ async function handleApi(req, res, pathname, url) {
 
   } else if (parts[1] === 'shops' && parts[2] && parts[3] === 'products' && !parts[4]) {
     const shop = findShop(parts[2]);
-    if (!shop) return bad(res, 'البقالة غير موجودة', 404);
+    if (!shop) return bad(res, 'المحل غير موجود', 404);
     if (m === 'POST') {
       const { name, price, unit, emoji } = body;
       if (!name || price == null || isNaN(+price) || +price < 0) return bad(res, 'اسم المنتج والسعر مطلوبان');
@@ -490,7 +510,7 @@ async function handleApi(req, res, pathname, url) {
 
   } else if (parts[1] === 'shops' && parts[2] && parts[3] === 'products' && parts[4]) {
     const shop = findShop(parts[2]);
-    if (!shop) return bad(res, 'البقالة غير موجودة', 404);
+    if (!shop) return bad(res, 'المحل غير موجود', 404);
     const product = shop.products.find((p) => p.id === parts[4]);
     if (!product) return bad(res, 'المنتج غير موجود', 404);
     if (m === 'PATCH') {
@@ -515,7 +535,7 @@ async function handleApi(req, res, pathname, url) {
   } else if (m === 'POST' && pathname === '/api/orders') {
     const { shopId, customer, items, notes } = body;
     const shop = findShop(shopId);
-    if (!shop) return bad(res, 'البقالة غير موجودة', 404);
+    if (!shop) return bad(res, 'المحل غير موجود', 404);
     if (shop.status !== 'active') return bad(res, 'هذا المحل غير مفعّل حالياً');
     if (!shop.isOpen) return bad(res, 'المحل مغلق حالياً، جرّب لاحقاً');
     if (!subActive(shop)) return bad(res, 'انتهى اشتراك هذا المحل — سيعود قريباً');
@@ -553,6 +573,7 @@ async function handleApi(req, res, pathname, url) {
       customerId: cust.id,
       customerName: cust.name,
       customerPhone: cust.phone,
+      customerPhone2: (customer.phone2 ? normPhone(customer.phone2) : '') || cust.phone2 || '',
       address: cust.address,
       shopId: shop.id,
       shopName: shop.name,
@@ -643,7 +664,9 @@ async function handleApi(req, res, pathname, url) {
     if (!validPhone(norm)) return bad(res, 'رقم الجوال غير صحيح — مثال صحيح: 0791234567');
     let d = db.drivers.find((x) => x.phone === norm);
     if (!d) {
-      d = { id: nextId('d'), name: name || 'سائق', phone: norm, status: 'active', online: false, deliveries: 0, earnings: 0, createdAt: Date.now() };
+      d = { id: nextId('d'), name: name || 'سائق', phone: norm, status: 'pending',
+        docsSubmitted: false, idImage: null, licenseImage: null,
+        phone2: '', address: '', online: false, deliveries: 0, earnings: 0, createdAt: Date.now() };
       db.drivers.push(d);
     } else if (name) {
       d.name = name;
@@ -664,11 +687,32 @@ async function handleApi(req, res, pathname, url) {
     saveDb();
     return json(res, 200, { ok: true });
 
+  } else if (m === 'PATCH' && parts[1] === 'drivers' && parts[2] && parts[3] === 'docs') {
+    // رفع صورة الهوية ورخصة السيارة + بيانات إضافية
+    const driver = findDriver(parts[2]);
+    if (!driver) return bad(res, 'السائق غير موجود', 404);
+    if (body.idImage) {
+      if (String(body.idImage).length > 700000) return bad(res, 'صورة الهوية كبيرة جداً');
+      driver.idImage = body.idImage;
+    }
+    if (body.licenseImage) {
+      if (String(body.licenseImage).length > 700000) return bad(res, 'صورة الرخصة كبيرة جداً');
+      driver.licenseImage = body.licenseImage;
+    }
+    if (body.phone2 !== undefined) driver.phone2 = body.phone2 ? normPhone(body.phone2) : '';
+    if (body.address !== undefined) driver.address = String(body.address).slice(0, 200);
+    driver.docsSubmitted = !!(driver.idImage && driver.licenseImage);
+    saveDb();
+    return json(res, 200, { driver });
+
   } else if (parts[1] === 'drivers' && parts[2] && !parts[3]) {
     const driver = findDriver(parts[2]);
     if (!driver) return bad(res, 'السائق غير موجود', 404);
     if (m === 'GET') return json(res, 200, { driver });
     if (m === 'PATCH') {
+      if (body.online === true && driver.status !== 'active') {
+        return bad(res, 'حسابك بانتظار اعتماد الإدارة — لا يمكن التفعيل الآن', 403);
+      }
       if (typeof body.online === 'boolean') driver.online = body.online;
       saveDb();
       return json(res, 200, { driver });
@@ -695,6 +739,7 @@ async function handleApi(req, res, pathname, url) {
         pendingShops: db.shops.filter((s) => s.status === 'pending').length,
         onlineDrivers: db.drivers.filter((d) => d.online && d.status === 'active').length,
         totalDrivers: db.drivers.length,
+        pendingDrivers: db.drivers.filter((d) => d.status === 'pending').length,
         totalCustomers: db.customers.length,
         // إيرادات المنصة
         monthlySubscriptions: round2(activeShops.length * db.settings.subscriptionFee),
@@ -707,7 +752,7 @@ async function handleApi(req, res, pathname, url) {
 
   } else if (parts[1] === 'admin' && parts[2] === 'shops' && parts[3] && !parts[4]) {
     const shop = findShop(parts[3]);
-    if (!shop) return bad(res, 'البقالة غير موجودة', 404);
+    if (!shop) return bad(res, 'المحل غير موجود', 404);
     if (m === 'PATCH') {
       if (['active', 'pending', 'blocked'].includes(body.status)) shop.status = body.status;
       if (typeof body.isOpen === 'boolean') shop.isOpen = body.isOpen;

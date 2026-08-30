@@ -1,5 +1,5 @@
 /* ============================================================
-   الزهور اكسبرس — لوحة البقالة / المحل
+   الزهور اكسبرس — لوحة المحل
    ============================================================ */
 'use strict';
 
@@ -12,6 +12,13 @@ function setHeader() {
   el('hdr-logo').textContent = shop.icon;
   el('hdr-title').textContent = shop.icon + ' ' + shop.name;
   el('hdr-sub').textContent = shop.category + (shop.isOpen ? ' — مفتوح' : ' — مغلق');
+  const b = el('shop-contact');
+  if (b) {
+    b.innerHTML = `
+      <div class="prow2"><span class="pl">📱 جوال المالك</span><b dir="ltr">${escapeHtml(shop.phone)}</b></div>
+      ${shop.phone2 ? `<div class="prow2"><span class="pl">📲 جوال إضافي</span><b dir="ltr">${escapeHtml(shop.phone2)}</b></div>` : ''}
+      ${shop.address ? `<div class="prow2" style="border-bottom:none"><span class="pl">📍 عنوان المحل</span><b>${escapeHtml(shop.address)}</b></div>` : ''}`;
+  }
 }
 
 function daysLeft(ts) {
@@ -70,11 +77,16 @@ async function register() {
   const phone = el('rg-phone').value.trim();
   const category = el('rg-category').value;
   const password = el('rg-pass').value;
+  const phone2 = el('rg-phone2').value.trim();
+  const area = el('rg-area').value.trim();
+  const street = el('rg-street').value.trim();
+  const landmark = el('rg-landmark').value.trim();
   if (!name || !owner) return toast('اكتب اسم المحل واسم المالك', 'bad');
   if (phone.replace(/\D/g, '').length < 9) return toast('اكتب رقم جوال صحيح — مثال: 0791234567', 'bad');
+  if (!area) return toast('اكتب عنوان المحل (الحي / المنطقة)', 'bad');
   if (password.length < 4) return toast('اختر رقماً سرياً (4 خانات على الأقل) — ستحتاجه كل مرة تدخل لوحتك', 'bad');
   try {
-    const d = await App.post('/shops/register', { name, owner, phone, category, password });
+    const d = await App.post('/shops/register', { name, owner, phone, category, password, phone2, area, street, landmark });
     // دخول تلقائي على المحل الجديد — فترة تجريبية 14 يوم تعمل فوراً
     shop = d.shop;
     App.save('shop', shop);

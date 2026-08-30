@@ -104,12 +104,12 @@ async function paintOverview() {
   `;
 }
 
-/* ---------------- إدارة البقالات ---------------- */
+/* ---------------- إدارة المحلات ---------------- */
 
 async function paintShops() {
   const d = await App.get('/shops?all=1');
   el('tab-shops').innerHTML = `
-    <div class="section-title">🏪 البقالات والمحلات <span class="count">${d.shops.length}</span></div>
+    <div class="section-title">🏪 المحلات والمحلات <span class="count">${d.shops.length}</span></div>
     ${d.shops.map((s) => {
       const daysLeft = s.subscriptionUntil ? Math.ceil((s.subscriptionUntil - Date.now()) / 86400000) : null;
       return `

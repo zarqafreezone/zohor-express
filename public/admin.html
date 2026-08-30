@@ -15,6 +15,7 @@
       <div class="sub">لوحة تحكم مالك التطبيق</div>
     </div>
     <a class="hdr-btn" href="/" style="text-decoration:none">الرئيسية</a>
+    <button class="hdr-btn" id="hdr-back" onclick="history.length > 1 ? history.back() : location.href='/'">رجوع</button>
     <button class="hdr-btn" id="btn-logout" style="display:none">خروج</button>
   </header>
 
@@ -39,7 +40,7 @@
   <div class="container" id="view-dash" style="display:none">
     <div class="tabs" id="admin-tabs">
       <button data-tab="overview" class="active">📊 نظرة عامة</button>
-      <button data-tab="shops">🏪 البقالات</button>
+      <button data-tab="shops">🏪 المحلات</button>
       <button data-tab="drivers">🛵 السائقون</button>
       <button data-tab="orders">🧾 الطلبات</button>
       <button data-tab="ads">📣 الإعلانات</button>

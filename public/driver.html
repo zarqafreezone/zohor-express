@@ -14,6 +14,7 @@
       <h1 id="hdr-title">الزهور اكسبرس</h1>
       <div class="sub" id="hdr-sub">لوحة السائق</div>
     </div>
+    <button class="hdr-btn" id="hdr-back" onclick="history.length > 1 ? history.back() : location.href='/'">رجوع</button>
     <a class="hdr-btn" href="/" style="text-decoration:none">الرئيسية</a>
   </header>
 
@@ -40,6 +41,8 @@
 
   <!-- لوحة السائق -->
   <div class="container" id="view-dash" style="display:none">
+    <div class="card profile-card" id="drv-card"></div>
+
     <div class="card row between">
       <div>
         <h4 style="font-size:14.5px" id="drv-name">—</h4>

@@ -16,6 +16,7 @@
       <h1 id="hdr-title">الزهور اكسبرس</h1>
       <div class="sub" id="hdr-sub">مرحباً بك 👋</div>
     </div>
+    <button class="hdr-btn" id="hdr-back" onclick="history.length > 1 ? history.back() : location.href='/'">رجوع</button>
     <a class="hdr-btn" href="/" style="text-decoration:none">الرئيسية</a>
   </header>
 
@@ -32,12 +33,30 @@
         <input class="input" id="in-name" placeholder="مثال: أحمد محمد">
       </div>
       <div class="field">
-        <label>رقم الجوال</label>
+        <label>رقم الموبايل</label>
         <input class="input" id="in-phone" type="tel" inputmode="tel" placeholder="0791234567 أو +962791234567">
       </div>
       <div class="field">
-        <label>عنوان التوصيل (داخل جبل الزهور)</label>
-        <input class="input" id="in-address" placeholder="مثال: جبل الزهور — شارع المسجد — بناية 12">
+        <label>رقم موبايل إضافي (اختياري)</label>
+        <input class="input" id="in-phone2" type="tel" inputmode="tel" placeholder="للتواصل البديل عند الإغلاق">
+      </div>
+      <div class="field">
+        <label>الحي / المنطقة</label>
+        <input class="input" id="in-area" placeholder="مثال: جبل الزهور — حي النزهة">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>الشارع</label>
+          <input class="input" id="in-street" placeholder="مثال: شارع الملكة رانيا">
+        </div>
+        <div class="field">
+          <label>البناية / الدور</label>
+          <input class="input" id="in-building" placeholder="مثال: بناية 12 — الطابق 3">
+        </div>
+      </div>
+      <div class="field">
+        <label>علامة مميزة قربك</label>
+        <input class="input" id="in-landmark" placeholder="مثال: مقابل مسجد النور">
       </div>
       <button class="btn block" id="btn-login">ابدأ الطلب 🌸</button>
     </div>

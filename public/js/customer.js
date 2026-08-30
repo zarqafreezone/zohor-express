@@ -8,7 +8,7 @@ const CAT_IMG = {
   'لحوم ومجمدات': '/img/shops/butcher.jpg', 'خضار وفواكه': '/img/shops/vegetables.jpg',
   'مخبز': '/img/shops/bakery.jpg', 'موبايلات واكسسوارات وبطاقات شحن': '/img/shops/mobile.jpg',
   'اجهزة كهربائية والكترونيات': '/img/shops/electronics.jpg', 'صيانة ومقاولات': '/img/shops/maintenance.jpg',
-  'دراي كلين': '/img/shops/dryclean.jpg', 'محلات فلترة المياه': '/img/shops/water.jpg',
+  'دراي كلين': '/img/shops/dryclean.jpg', 'مياه شرب': '/img/shops/water.jpg',
   'أخرى': '/img/shops/spices.jpg',
 };
 
@@ -44,25 +44,33 @@ function show(view) {
 
 function renderLogin() {
   show('login');
-  if (me) {
-    document.getElementById('in-name').value = me.name || '';
-    document.getElementById('in-phone').value = me.phone || '';
-    document.getElementById('in-address').value = me.address || '';
-  }
+  if (me) fillCustForm('in', me);
+}
+
+function readCustForm(prefix) {
+  const g = (id) => (document.getElementById(prefix + id) || { value: '' }).value.trim();
+  return {
+    name: g('-name'), phone: g('-phone'), phone2: g('-phone2'),
+    area: g('-area'), street: g('-street'), building: g('-building'), landmark: g('-landmark'),
+  };
+}
+
+function fillCustForm(prefix, c) {
+  const set = (id, v) => { const el = document.getElementById(prefix + id); if (el) el.value = v || ''; };
+  set('-name', c.name); set('-phone', c.phone); set('-phone2', c.phone2);
+  set('-area', c.area); set('-street', c.street); set('-building', c.building); set('-landmark', c.landmark);
 }
 
 async function doLogin() {
-  const name = document.getElementById('in-name').value.trim();
-  const phone = document.getElementById('in-phone').value.trim();
-  const address = document.getElementById('in-address').value.trim();
-  if (name.length < 2) return toast('اكتب اسمك أولاً 🙂', 'bad');
-  if (phone.replace(/\D/g, '').length < 9) return toast('اكتب رقم جوال صحيح — مثال: 0791234567', 'bad');
-  if (!address) return toast('اكتب عنوان التوصيل', 'bad');
+  const f = readCustForm('in');
+  if (f.name.length < 2) return toast('اكتب اسمك أولاً 🙂', 'bad');
+  if (f.phone.replace(/\D/g, '').length < 9) return toast('اكتب رقم موبايل صحيح — مثال: 0791234567', 'bad');
+  if (!f.area) return toast('اكتب الحي / المنطقة (مطلوب للتوصيل)', 'bad');
   const btn = document.getElementById('btn-login');
   btn.disabled = true;
   btn.textContent = 'جارٍ الدخول…';
   try {
-    const d = await App.post('/customers/login', { name, phone, address });
+    const d = await App.post('/customers/login', f);
     me = d.customer;
     App.save('customer', me);
     renderHome();
@@ -342,7 +350,7 @@ function openCheckout() {
       const items = Object.entries(cartOf(currentShop.id)).map(([productId, qty]) => ({ productId, qty }));
       const d = await App.post('/orders', {
         shopId: currentShop.id,
-        customer: { id: me.id, name, phone: me.phone, address },
+        customer: { id: me.id, name, phone: me.phone, phone2: me.phone2 || '', address },
         items, notes,
       });
       me = { ...me, name, address };
@@ -586,38 +594,62 @@ async function renderTrack() {
 function renderAccount() {
   show('account');
   document.getElementById('hdr-title').textContent = 'الزهور اكسبرس';
-  document.getElementById('hdr-sub').textContent = 'حسابي';
+  document.getElementById('hdr-sub').textContent = 'بطاقتي التعريفية';
   const el = document.getElementById('view-account');
   el.innerHTML = `
-    <div class="login-hero">
-      <div class="big">👤</div>
-      <h2>${escapeHtml(me.name)}</h2>
-      <p>📱 ${escapeHtml(me.phone)}</p>
-    </div>
-    <div class="card">
-      <div class="field">
-        <label>الاسم</label>
-        <input class="input" id="ac-name" value="${escapeHtml(me.name)}">
+    <div class="card profile-card">
+      <div class="row" style="margin-bottom:10px">
+        <div class="avatar">👤</div>
+        <div class="flex1">
+          <h3 style="font-size:17px">${escapeHtml(me.name)}</h3>
+          <span class="chip vio">🛍️ زبون — منطقة جبل الزهور</span>
+        </div>
       </div>
-      <div class="field">
-        <label>عنوان التوصيل</label>
-        <input class="input" id="ac-address" value="${escapeHtml(me.address)}">
-      </div>
-      <button class="btn block" id="ac-save">حفظ التعديلات</button>
+      <div class="prow2"><span class="pl">📱 موبايل أساسي</span><b dir="ltr">${escapeHtml(me.phone)}</b></div>
+      <div class="prow2"><span class="pl">📲 موبايل إضافي</span><b dir="ltr">${me.phone2 ? escapeHtml(me.phone2) : '<span class="muted">غير مسجل</span>'}</b></div>
+      <div class="prow2"><span class="pl">🏘️ الحي / المنطقة</span><b>${escapeHtml(me.area || '—')}</b></div>
+      <div class="prow2"><span class="pl">🛣️ الشارع</span><b>${escapeHtml(me.street || '—')}</b></div>
+      <div class="prow2"><span class="pl">🏢 البناية / الدور</span><b>${escapeHtml(me.building || '—')}</b></div>
+      <div class="prow2" style="border-bottom:none"><span class="pl">📍 علامة مميزة</span><b>${escapeHtml(me.landmark || '—')}</b></div>
     </div>
+    <button class="btn block" id="ac-edit">✏️ تعديل بطاقتي</button>
+    <div style="height:8px"></div>
     <button class="btn ghost block" id="ac-logout">🚪 تسجيل الخروج</button>
   `;
-  document.getElementById('ac-save').onclick = async () => {
-    const name = document.getElementById('ac-name').value.trim();
-    const address = document.getElementById('ac-address').value.trim();
-    if (name.length < 2 || !address) return toast('تحقق من الاسم والعنوان', 'bad');
-    try {
-      const d = await App.post('/customers/login', { name, phone: me.phone, address });
-      me = d.customer;
-      App.save('customer', me);
-      toast('تم الحفظ ✅', 'ok');
-      renderAccount();
-    } catch (e) { toast(e.message, 'bad'); }
+  document.getElementById('ac-edit').onclick = () => {
+    openSheet(`
+      <h3>✏️ تعديل بطاقتي التعريفية</h3>
+      <div class="field"><label>الاسم</label><input class="input" id="cf-name" value="${escapeHtml(me.name)}"></div>
+      <div class="field"><label>رقم الموبايل (ثابت)</label><input class="input" value="${escapeHtml(me.phone)}" readonly style="background:#f1eefb"></div>
+      <div class="field"><label>رقم موبايل إضافي</label><input class="input" id="cf-phone2" inputmode="tel" value="${escapeHtml(me.phone2 || '')}"></div>
+      <div class="field"><label>الحي / المنطقة</label><input class="input" id="cf-area" value="${escapeHtml(me.area || '')}"></div>
+      <div class="grid2">
+        <div class="field"><label>الشارع</label><input class="input" id="cf-street" value="${escapeHtml(me.street || '')}"></div>
+        <div class="field"><label>البناية / الدور</label><input class="input" id="cf-building" value="${escapeHtml(me.building || '')}"></div>
+      </div>
+      <div class="field"><label>علامة مميزة</label><input class="input" id="cf-landmark" value="${escapeHtml(me.landmark || '')}"></div>
+      <button class="btn ok block" id="cf-save">💾 حفظ</button>
+      <div style="height:6px"></div>
+      <button class="btn ghost block" onclick="closeSheet()">إلغاء</button>
+    `);
+    document.getElementById('cf-save').onclick = async () => {
+      const g = (id) => document.getElementById(id).value.trim();
+      const name = g('cf-name');
+      if (name.length < 2) return toast('الاسم قصير', 'bad');
+      if (!g('cf-area')) return toast('الحي / المنطقة مطلوبة', 'bad');
+      try {
+        const d = await App.post('/customers/login', {
+          name, phone: me.phone,
+          phone2: g('cf-phone2'), area: g('cf-area'), street: g('cf-street'),
+          building: g('cf-building'), landmark: g('cf-landmark'),
+        });
+        me = d.customer;
+        App.save('customer', me);
+        closeSheet();
+        toast('حُدّثت بطاقتك ✅', 'ok');
+        renderAccount();
+      } catch (e) { toast(e.message, 'bad'); }
+    };
   };
   document.getElementById('ac-logout').onclick = () => {
     App.clear('customer');
@@ -630,11 +662,11 @@ function renderAccount() {
 
 // ربط زر «ابدأ الطلب» (كان مفقوداً — هذا سبب عدم عمل الزر)
 document.getElementById('btn-login').addEventListener('click', doLogin);
-document.getElementById('in-address').addEventListener('keydown', (e) => {
+document.getElementById('in-landmark').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') doLogin();
 });
 document.getElementById('in-phone').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') document.getElementById('in-address').focus();
+  if (e.key === 'Enter') document.getElementById('in-area').focus();
 });
 
 document.querySelectorAll('#nav a').forEach((a) => {

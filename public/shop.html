@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>البقالة / المحل — الزهور اكسبرس</title>
+  <title>المحل — الزهور اكسبرس</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🏪%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -12,16 +12,17 @@
     <div class="logo" id="hdr-logo">🏪</div>
     <div class="titles">
       <h1 id="hdr-title">الزهور اكسبرس</h1>
-      <div class="sub" id="hdr-sub">لوحة البقالة / المحل</div>
+      <div class="sub" id="hdr-sub">لوحة المحل</div>
     </div>
+    <button class="hdr-btn" id="hdr-back" onclick="history.length > 1 ? history.back() : location.href='/'">رجوع</button>
     <a class="hdr-btn" href="/" style="text-decoration:none">الرئيسية</a>
   </header>
 
-  <!-- اختيار البقالة / تسجيل -->
+  <!-- اختيار المحل / تسجيل -->
   <div class="container" id="view-login" style="display:none">
     <div class="login-hero">
       <div class="big">🏪</div>
-      <h2>دخول البقالات والمحلات</h2>
+      <h2>دخول المحلات</h2>
       <p>اختر محلك للدخول (وضع تجريبي) أو سجّل محلك الجديد</p>
     </div>
     <div class="card" id="shops-list"></div>
@@ -32,6 +33,12 @@
       <div class="field"><label>اسم المحل</label><input class="input" id="rg-name" placeholder="مثال: بقالة الصفا"></div>
       <div class="field"><label>اسم المالك</label><input class="input" id="rg-owner" placeholder="مثال: أبو سامر"></div>
       <div class="field"><label>جوال المالك</label><input class="input" id="rg-phone" type="tel" inputmode="tel" placeholder="0791234567 أو +962791234567"></div>
+      <div class="field"><label>جوال إضافي (اختياري)</label><input class="input" id="rg-phone2" type="tel" inputmode="tel" placeholder="رقم بديل للتواصل"></div>
+      <div class="field"><label>عنوان المحل — الحي / المنطقة</label><input class="input" id="rg-area" placeholder="مثال: جبل الزهور — بجوار السوق"></div>
+      <div class="grid2">
+        <div class="field"><label>الشارع</label><input class="input" id="rg-street" placeholder="اسم الشارع"></div>
+        <div class="field"><label>علامة مميزة</label><input class="input" id="rg-landmark" placeholder="مثال: مقابل الصيدلية"></div>
+      </div>
       <div class="field"><label>رقم سري لإدارة محلك (4 خانات أو أكثر)</label><input class="input" id="rg-pass" type="password" inputmode="numeric" placeholder="مثال: 1234"></div>
       <div class="field"><label>نوع النشاط</label>
         <select class="input" id="rg-category"></select>
@@ -50,6 +57,8 @@
 
   <!-- لوحة المحل -->
   <div class="container" id="view-dash" style="display:none">
+    <div class="card" id="shop-contact"></div>
+
     <div class="card row between" id="sub-card">
       <div>
         <h4 style="font-size:14px">📅 حالة الاشتراك</h4>
