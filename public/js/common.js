@@ -19,7 +19,15 @@ const App = {
 
   // استدعاءات API
   async req(url, method, body) {
-    const opts = { method: method || 'GET', headers: { 'Content-Type': 'application/json' } };
+    const headers = { 'Content-Type': 'application/json' };
+    // رمز جلسة الإدارة (يُرفق تلقائياً مع طلبات /admin)
+    if (url.startsWith('/admin')) {
+      try {
+        const t = JSON.parse(sessionStorage.getItem('zh_adminToken'));
+        if (t) headers['x-admin-token'] = t;
+      } catch { /* لا رمز */ }
+    }
+    const opts = { method: method || 'GET', headers };
     if (body !== undefined) opts.body = JSON.stringify(body);
     const r = await fetch('/api' + url, opts);
     let data = {};

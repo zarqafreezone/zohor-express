@@ -9,6 +9,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
@@ -113,7 +114,7 @@ function seedDb() {
   const data = {
     orderCode: 2000,
     settings: {
-      adminPassword: 'admin123',
+      adminPassword: 'Zohor@2026',
       deliveryFee: 0.5,
       area: 'منطقة جبل الزهور',
       subscriptionFee: SUBSCRIPTION_FEE,
@@ -373,6 +374,13 @@ async function handleApi(req, res, pathname, url) {
   const m = req.method;
   const body = (m === 'GET') ? {} : await readBody(req);
   const q = (k) => url.searchParams.get(k);
+
+  // 🛡️ حماية الإدارة: كل مسارات /api/admin تتطلب رمز جلسة صحيح
+  if (parts[1] === 'admin' && pathname !== '/api/admin/login') {
+    if (!db.settings.adminToken || req.headers['x-admin-token'] !== db.settings.adminToken) {
+      return bad(res, 'غير مصرح — سجّل دخول الإدارة أولاً', 401);
+    }
+  }
 
   /* ---------- عام ---------- */
   if (m === 'GET' && pathname === '/api/health') {
@@ -735,7 +743,10 @@ async function handleApi(req, res, pathname, url) {
   /* ---------- الإدارة ---------- */
   } else if (m === 'POST' && pathname === '/api/admin/login') {
     if (body.password !== db.settings.adminPassword) return bad(res, 'كلمة المرور غير صحيحة', 401);
-    return json(res, 200, { ok: true });
+    // رمز جلسة جديد في كل دخول ناجح
+    db.settings.adminToken = crypto.randomBytes(24).toString('hex');
+    saveDb();
+    return json(res, 200, { ok: true, token: db.settings.adminToken });
 
   } else if (m === 'GET' && pathname === '/api/admin/overview') {
     const todayStart = new Date().setHours(0, 0, 0, 0);

@@ -19,7 +19,8 @@ function renderLogin() {
 async function doLogin() {
   const p = el('in-pass').value;
   try {
-    await App.post('/admin/login', { password: p });
+    const d = await App.post('/admin/login', { password: p });
+    App.save('adminToken', d.token);
     adminOk = true;
     App.save('admin', true);
     renderDash();
@@ -29,6 +30,7 @@ async function doLogin() {
 function logout() {
   adminOk = false;
   App.clear('admin');
+  App.clear('adminToken');
   renderLogin();
 }
 
@@ -53,6 +55,11 @@ async function refreshTab() {
     else if (currentTab === 'orders') await paintOrders();
     else if (currentTab === 'ads') await paintAds();
   } catch (e) {
+    if (String(e.message).includes('غير مصرح')) {
+      logout();
+      toast('انتهت جلسة الإدارة — سجّل الدخول من جديد', 'bad');
+      return;
+    }
     toast(e.message, 'bad');
   }
 }

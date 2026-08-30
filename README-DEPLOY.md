@@ -84,7 +84,7 @@ zohor-express/
     ├── customer.html ← واجهة الزبون
     ├── shop.html    ← لوحة المحل
     ├── driver.html  ← لوحة السائق
-    ├── admin.html   ← لوحة الإدارة (admin123)
+    ├── admin.html   ← لوحة الإدارة (Zohor@2026)
     ├── css/style.css
     └── js/ (common, customer, shop, driver, admin)
 ```
