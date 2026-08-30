@@ -1,5 +1,5 @@
 {
-  "name": "alzaher-express",
+  "name": "zohor-express",
   "version": "1.0.0",
   "description": "الزهور اكسبرس — تطبيق يربط المحلات بالزبائن والسائقين في منطقة جبل الزهور",
   "main": "server.js",

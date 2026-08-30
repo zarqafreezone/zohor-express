@@ -334,7 +334,7 @@ async function handleApi(req, res, pathname, url) {
 
   /* ---------- عام ---------- */
   if (m === 'GET' && pathname === '/api/health') {
-    return json(res, 200, { ok: true, app: 'alzaher-express', area: db.settings.area });
+    return json(res, 200, { ok: true, app: 'zohor-express', area: db.settings.area });
 
   } else if (m === 'GET' && pathname === '/api/ads') {
     return json(res, 200, { ads: db.ads.filter((a) => a.active) });

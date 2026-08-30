@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: alzaher-express
+    name: zohor-express
     runtime: node
     plan: free
     buildCommand: npm install

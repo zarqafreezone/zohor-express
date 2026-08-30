@@ -26,9 +26,9 @@
 
 ### الخطوة 2: رفع ملفات التطبيق
 1. بعد الدخول لـ GitHub اضغط زر **+** أعلى اليمين ثم **New repository**.
-2. الاسم: `alzaher-express` — اجعله **Public** — اضغط **Create repository**.
+2. الاسم: `zohor-express` — اجعله **Public** — اضغط **Create repository**.
 3. في صفحة المستودع الجديد اضغط رابط **uploading an existing file**.
-4. من مجلد `zohur-express` اسحب **محتويات** المجلد (وليس المجلد نفسه) إلى المتصفح:
+4. من مجلد `zohor-express` اسحب **محتويات** المجلد (وليس المجلد نفسه) إلى المتصفح:
    - `server.js` و `package.json` و `render.yaml` و `Dockerfile`
    - مجلد `public` كاملاً (داخله 5 صفحات + js + css)
 5. انتظر الرفع ثم اضغط **Commit changes**.
@@ -36,13 +36,13 @@
 ### الخطوة 3: النشر على Render
 1. افتح `https://render.com` → **Get Started** → سجّل الدخول **بحساب GitHub**.
 2. من اللوحة اضغط **New +** → **Web Service**.
-3. اختر المستودع `alzaher-express` → **Connect**.
+3. اختر المستودع `zohor-express` → **Connect**.
 4. اترك الإعدادات كما هي (سيتعرف عليها تلقائياً من `render.yaml`):
    - Runtime: Node | Build: `npm install` | Start: `npm start`
    - Instance Type: **Free**
 5. اضغط **Create Web Service** وانتظر دقيقتين.
 6. 🎉 ستحصل على رابط مثل:
-   `https://alzaher-express.onrender.com`
+   `https://zohor-express.onrender.com`
 
 هذا هو رابط تطبيقك الحقيقي — أرسله للزبائن والسائقين، وافتحه في أي جوال.
 
@@ -61,7 +61,7 @@
 1. سجّل في `https://cloud.oracle.com` (يطلب بطاقة للتحقق من الهوية — **لن يتم أي خصم** ضمن Always Free).
 2. أنشئ **VM Instance** واختر الشكل **Always Free** (Ampere A1 أو VM.Standard.E2.1.Micro) بنظام Ubuntu.
 3. اتصل بالخادم عبر SSH ثم أعطني كلمة «جاهز» وسأعطيك الأوامر سطراً سطراً:
-   - تثبيت Node.js → رفع ملفات التطبيق → تشغيله بـ pm2 (يعيد تشغيله تلقائياً لو توقف) → فتح المنفذ 80 → يعمل على IP عام حقيقي (ويمكن ربط دومين مثل `alzaher.jo` لاحقاً).
+   - تثبيت Node.js → رفع ملفات التطبيق → تشغيله بـ pm2 (يعيد تشغيله تلقائياً لو توقف) → فتح المنفذ 80 → يعمل على IP عام حقيقي (ويمكن ربط دومين مثل `zohor.jo` لاحقاً).
 
 ---
 
@@ -74,7 +74,7 @@
 ## 📦 ملفات المشروع المرفوعة
 
 ```
-alzaher-express/
+zohor-express/
 ├── server.js        ← الخادم الكامل (API + كل المنطق)
 ├── package.json     ← تعريف المشروع وأمر التشغيل
 ├── render.yaml      ← إعدادات النشر التلقائي على Render
