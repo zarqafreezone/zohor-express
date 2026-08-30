@@ -168,7 +168,7 @@ function paintOffers(offers) {
       ${offers.slice(0, 12).map((of) => `
         <div class="offer-card" onclick="openShop('${of.shopId}')">
           <div class="o-disc">-${of.discount}%</div>
-          <div class="o-emoji">${of.product.emoji}</div>
+          ${of.product.image ? `<img class="o-img" src="${of.product.image}" alt="">` : `<div class="o-emoji">${of.product.emoji}</div>`}
           <div class="o-name">${escapeHtml(of.product.name)}</div>
           <div class="o-prices">
             <span class="o-old">${App.fmt(of.product.oldPrice)}</span>
@@ -268,7 +268,7 @@ function renderShopPage() {
       const disc = p.oldPrice && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0;
       return `
         <div class="product-row" style="${p.available ? '' : 'opacity:.45'}">
-          <div class="p-emoji">${p.emoji}</div>
+          ${p.image ? `<img class="p-thumb" src="${p.image}" alt="">` : `<div class="p-emoji">${p.emoji}</div>`}
           <div class="flex1">
             <div class="p-name">${escapeHtml(p.name)} ${disc ? `<span class="chip warn">🔥 خصم ${disc}%</span>` : ''} ${p.available ? '' : '<span class="chip gray">غير متوفر</span>'}</div>
             <div class="p-unit">${escapeHtml(p.unit)}</div>

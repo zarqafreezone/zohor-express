@@ -499,11 +499,16 @@ async function handleApi(req, res, pathname, url) {
     const shop = findShop(parts[2]);
     if (!shop) return bad(res, 'المحل غير موجود', 404);
     if (m === 'POST') {
-      const { name, price, unit, emoji } = body;
+      const { name, price, unit, emoji, image } = body;
       if (!name || price == null || isNaN(+price) || +price < 0) return bad(res, 'اسم المنتج والسعر مطلوبان');
+      if (image) {
+        if (!String(image).startsWith('data:image/')) return bad(res, 'صورة غير صالحة');
+        if (String(image).length > 600000) return bad(res, 'الصورة كبيرة جداً');
+      }
       const product = {
         id: nextId('p'), name, price: round2(+price),
         unit: unit || 'حبة', emoji: emoji || '📦', available: true,
+        ...(image ? { image } : {}),
       };
       shop.products.push(product);
       saveDb();
@@ -521,6 +526,13 @@ async function handleApi(req, res, pathname, url) {
       if (body.emoji) product.emoji = body.emoji;
       if (body.price != null && !isNaN(+body.price)) product.price = round2(+body.price);
       if (typeof body.available === 'boolean') product.available = body.available;
+      // صورة المنتج (إضافة أو تغيير أو إزالة بـ null)
+      if (body.image === null) delete product.image;
+      else if (body.image) {
+        if (!String(body.image).startsWith('data:image/')) return bad(res, 'صورة غير صالحة');
+        if (String(body.image).length > 600000) return bad(res, 'الصورة كبيرة جداً');
+        product.image = body.image;
+      }
       // نظام العروض: oldPrice = السعر قبل التخفيض (null لإلغاء العرض)
       if (body.oldPrice === null) delete product.oldPrice;
       else if (body.oldPrice != null && !isNaN(+body.oldPrice) && +body.oldPrice > 0) product.oldPrice = round2(+body.oldPrice);

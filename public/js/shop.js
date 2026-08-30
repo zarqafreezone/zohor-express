@@ -237,6 +237,14 @@ function paintProducts() {
         <div class="field"><label>السعر (د.أ)</label><input class="input" id="pr-price" type="number" step="0.05" min="0" placeholder="0.00"></div>
         <div class="field"><label>الوحدة</label><input class="input" id="pr-unit" placeholder="كغ / حبة / خدمة"></div>
       </div>
+      <div class="field">
+        <label>📷 اضافة صورة (اختياري — تظهر للزبائن)</label>
+        <input type="file" id="pr-image" accept="image/*" capture="environment" style="width:100%">
+        <div id="pr-img-preview" style="display:none; margin-top:8px">
+          <img id="pr-preview-img" alt="" style="width:84px; height:84px; object-fit:cover; border-radius:12px; border:1.5px solid var(--line); vertical-align:middle">
+          <button class="btn bad sm" id="btn-rm-img" style="margin-right:8px">إزالة الصورة</button>
+        </div>
+      </div>
       <button class="btn block" id="btn-add-product">إضافة للقائمة</button>
     </div>
     <div class="card">
@@ -246,7 +254,7 @@ function paintProducts() {
         const disc = p.oldPrice && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0;
         return `
         <div class="product-row" style="${p.available ? '' : 'opacity:.5'}">
-          <div class="p-emoji">${p.emoji}</div>
+          ${p.image ? `<img class="p-thumb" src="${p.image}" alt="">` : `<div class="p-emoji">${p.emoji}</div>`}
           <div class="flex1">
             <div class="p-name">${escapeHtml(p.name)} ${disc ? `<span class="chip warn">🔥 خصم ${disc}%</span>` : ''}</div>
             <div class="p-unit">${escapeHtml(p.unit)} •
@@ -258,6 +266,7 @@ function paintProducts() {
           ${disc
             ? `<button class="btn soft sm" data-unoffer="${p.id}">إلغاء العرض</button>`
             : `<button class="btn warn sm" data-offer="${p.id}">🏷️ تخفيض</button>`}
+          <button class="btn soft sm" data-img="${p.id}" title="صورة المنتج">${p.image ? '🖼️ تغيير' : '📷 صورة'}</button>
           <button class="btn soft sm" data-toggle="${p.id}">${p.available ? 'إخفاء' : 'إظهار'}</button>
           <button class="btn bad sm icon" data-del="${p.id}">🗑</button>
         </div>
@@ -266,6 +275,30 @@ function paintProducts() {
     <button class="btn ghost sm block" id="btn-change-pass" style="margin-bottom:14px">🔑 تغيير الرقم السري</button>
   `;
   el('btn-add-product').onclick = addProduct;
+
+  // معاينة صورة المنتج الجديد
+  const imgInput = document.getElementById('pr-image');
+  const prev = document.getElementById('pr-img-preview');
+  if (imgInput) {
+    imgInput.onchange = async () => {
+      const f = imgInput.files[0];
+      if (!f) { prev.style.display = 'none'; return; }
+      try {
+        document.getElementById('pr-preview-img').src = await fileToDataUrl(f, 500, 0.55);
+        prev.style.display = '';
+      } catch { toast('صورة غير صالحة', 'bad'); }
+    };
+    document.getElementById('btn-rm-img').onclick = () => {
+      imgInput.value = '';
+      prev.style.display = 'none';
+    };
+  }
+
+  // زر 📷 لكل منتج موجود
+  document.querySelectorAll('#tab-products button[data-img]').forEach((b) => {
+    b.onclick = () => pickProductImage(b.dataset.img);
+  });
+
   const cpBtn = document.getElementById('btn-change-pass');
   if (cpBtn) cpBtn.onclick = changePass;
   document.querySelectorAll('#tab-products button[data-offer]').forEach((b) => {
@@ -323,12 +356,34 @@ async function addProduct() {
   const unit = el('pr-unit').value.trim() || 'حبة';
   if (!name) return toast('اكتب اسم المنتج', 'bad');
   if (isNaN(price) || price < 0) return toast('اكتب سعراً صحيحاً', 'bad');
+  const prev = document.getElementById('pr-img-preview');
+  const image = (prev && prev.style.display !== 'none') ? document.getElementById('pr-preview-img').src : null;
   try {
-    const d = await App.post(`/shops/${shop.id}/products`, { name, price, unit });
+    const d = await App.post(`/shops/${shop.id}/products`, { name, price, unit, ...(image ? { image } : {}) });
     shop = d.shop; App.save('shop', shop);
-    toast('أُضيف المنتج ✅', 'ok');
+    toast(image ? 'أُضيف المنتج بالصورة ✅📷' : 'أُضيف المنتج ✅', 'ok');
     paintProducts();
   } catch (e) { toast(e.message, 'bad'); }
+}
+
+// اختيار/تغيير صورة منتج موجود
+function pickProductImage(pid) {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.onchange = async () => {
+    const f = inp.files[0];
+    if (!f) return;
+    toast('⏳ جارٍ تجهيز الصورة…');
+    try {
+      const image = await fileToDataUrl(f, 500, 0.55);
+      const d = await App.patch(`/shops/${shop.id}/products/${pid}`, { image });
+      shop = d.shop; App.save('shop', shop);
+      toast('📷 حُدّثت صورة المنتج', 'ok');
+      paintProducts();
+    } catch (e) { toast(e.message || 'تعذر رفع الصورة', 'bad'); }
+  };
+  inp.click();
 }
 
 /* ---------------- ربط الأحداث ---------------- */
