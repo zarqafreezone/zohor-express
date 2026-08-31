@@ -11,6 +11,60 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+/* ═══════════ وضع التخزين ═══════════
+   DATABASE_URL موجودة → PostgreSQL سحابي دائم (الإنتاج)
+   غير موجودة → ملف JSON محلي (وضع التطوير/الاحتياطي) */
+const DATABASE_URL = process.env.DATABASE_URL || '';
+let pgPool = null;
+let dbReady = Promise.resolve();
+let db = null;
+
+if (DATABASE_URL) {
+  const { Pool } = require('pg');
+  pgPool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: 5,
+  });
+  console.log('🗄️  التخزين: PostgreSQL سحابي دائم (Neon)');
+} else {
+  console.log('📁 التخزين: ملف محلي data/db.json (وضع احتياطي — البيانات غير دائمة عبر النشر)');
+}
+
+/* حفظ المستند في القاعدة (سطر واحد JSON) — إن وجد PostgreSQL */
+async function pgPersist() {
+  if (!pgPool || !db) return;
+  await pgPool.query(
+    'INSERT INTO app_state (id, data, updated_at) VALUES (1, $1, NOW()) ' +
+    'ON CONFLICT (id) DO UPDATE SET data = $1, updated_at = NOW()',
+    [JSON.stringify(db)]
+  );
+}
+
+/* حفظ غير متزامن لا يكسر الطلبات — يضمن الاستمرارية مع السحابة */
+let _saving = false;
+let _dirtyAgain = false;
+function saveDb() {
+  if (!pgPool) {
+    try { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8'); } catch (e) { console.error('save file err:', e.message); }
+    return;
+  }
+  if (_saving) { _dirtyAgain = true; return; }
+  _saving = true;
+  const snap = JSON.stringify(db);
+  pgPool.query(
+    'INSERT INTO app_state (id, data, updated_at) VALUES (1, $1::jsonb, NOW()) ' +
+    'ON CONFLICT (id) DO UPDATE SET data = $1::jsonb, updated_at = NOW()',
+    [snap]
+  ).then(() => {
+    _saving = false;
+    if (_dirtyAgain) { _dirtyAgain = false; saveDb(); }
+  }).catch((e) => {
+    _saving = false;
+    console.error('❌ فشل الحفظ السحابي:', e.message);
+  });
+}
+
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -85,20 +139,6 @@ function buildAddress(c) {
 }
 
 /* ---------------- قاعدة البيانات (ملف JSON) ---------------- */
-
-let db = null;
-
-function nextId(prefix) {
-  db.seq += 1;
-  return prefix + db.seq;
-}
-function nextOrderCode() {
-  db.orderCode += 1;
-  return String(db.orderCode);
-}
-function saveDb() {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
-}
 
 function seedDb() {
   const now = Date.now();
@@ -297,18 +337,50 @@ function seedDb() {
   return data;
 }
 
-function loadDb() {
+function loadFromLocalFile() {
   try {
-    fs.mkdirSync(DATA_DIR, { recursive: true }); // إنشاء مجلد البيانات إن لم يوجد (مهم للنشر على خوادم جديدة)
+    fs.mkdirSync(DATA_DIR, { recursive: true });
     if (fs.existsSync(DB_FILE)) {
       db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-      return;
+      return true;
     }
   } catch (e) {
-    console.error('تعذر قراءة قاعدة البيانات، سيتم إعادة التهيئة:', e.message);
+    console.error('تعذر قراءة الملف المحلي:', e.message);
   }
-  db = seedDb();
-  saveDb();
+  return false;
+}
+
+async function loadDb() {
+  if (pgPool) {
+    try {
+      // إنشاء الجدول إن لم يوجد ثم جلب الحالة
+      await pgPool.query(
+        'CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())'
+      );
+      const r = await pgPool.query('SELECT data FROM app_state WHERE id = 1');
+      if (r.rows.length) {
+        db = r.rows[0].data;
+        console.log('✅ حُمّلت البيانات من السحابة — محلات:', db.shops.length, '| طلبات:', db.orders.length);
+        return;
+      }
+      // قاعدة فارغة: هل نستورد ملفاً محلياً قديماً (ترحيل بياناتك الحالية)؟
+      if (loadFromLocalFile()) {
+        console.log('📦 استُوردت البيانات المحلية إلى السحابة — محلات:', db.shops.length);
+      } else {
+        db = seedDb();
+        console.log('🌱 أُنشئت بيانات أولى جديدة في السحابة');
+      }
+      await pgPersist();
+      return;
+    } catch (e) {
+      console.error('❌ خطأ قاعدة البيانات السحابية:', e.message);
+      console.log('↩️  سنعمل بالملف المحلي مؤقتاً حتى تعود الاتصال');
+    }
+  }
+  if (!loadFromLocalFile()) {
+    db = seedDb();
+    saveDb();
+  }
 }
 function resetDb() {
   db = seedDb();
@@ -870,7 +942,7 @@ function serveStatic(res, pathname) {
 
 /* ---------------- التشغيل ---------------- */
 
-loadDb();
+dbReady = loadDb();
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -891,6 +963,11 @@ const server = http.createServer((req, res) => {
   }
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🌸 الزهور اكسبرس يعمل الآن على المنفذ ${PORT} — منطقة ${db.settings.area}`);
+dbReady.then(() => {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌸 الزهور اكسبرس يعمل الآن على المنفذ ${PORT} — منطقة ${db.settings.area}`);
+  });
+}).catch((e) => {
+  console.error('فشل تهيئة البيانات:', e);
+  process.exit(1);
 });

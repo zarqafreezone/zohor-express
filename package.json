@@ -9,5 +9,10 @@
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "keywords": [],
+  "author": "",
+  "dependencies": {
+    "pg": "^8.23.0"
+  }
 }
