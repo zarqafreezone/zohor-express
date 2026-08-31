@@ -93,8 +93,9 @@ function toast(msg, type) {
   setTimeout(() => t.remove(), 2800);
 }
 
-// صوت تنبيه قصير (للسائق عند وصول طلب جديد)
+// صوت تأكيد قصير — يعتمد محرك الأصوات المميزة إن كان محمّلاً (sounds.js)
 function beep() {
+  if (window.ZhSounds) return ZhSounds.blip();
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const o = ctx.createOscillator();
@@ -105,6 +106,14 @@ function beep() {
     o.start();
     setTimeout(() => { o.stop(); ctx.close(); }, 200);
   } catch { /* لا شيء */ }
+}
+
+// المسافة بين نقطتين بالمتر — لتنبيه الزبون عند اقتراب السائق
+function distMeters(la1, lo1, la2, lo2) {
+  const R = 6371000, rad = (x) => (x * Math.PI) / 180;
+  const dLa = rad(la2 - la1), dLo = rad(lo2 - lo1);
+  const a = Math.sin(dLa / 2) ** 2 + Math.cos(rad(la1)) * Math.cos(rad(la2)) * Math.sin(dLo / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 // نافذة سفلية (Sheet) قابلة للإغلاق

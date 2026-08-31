@@ -730,6 +730,17 @@ async function handleApi(req, res, pathname, url) {
     if (q('status')) list = list.filter((o) => o.status === q('status'));
     if (q('active') === '1') list = list.filter((o) => !['delivered', 'rejected', 'cancelled'].includes(o.status));
     list.sort((a, b) => b.createdAt - a.createdAt);
+    // إرفاق موقع السائق الحديث بطلبات التوصيل النشطة (ليتنبه الزبون لاقتراب السائق)
+    // نسخة سطحية فقط — لا نعدّل كائنات القاعدة نفسها
+    list = list.map((o) => {
+      if ((o.status === 'assigned' || o.status === 'picked_up') && o.driverId) {
+        const drv = findDriver(o.driverId);
+        if (drv && drv.location && Date.now() - drv.location.updatedAt < 15 * 60000) {
+          return { ...o, driverLocation: drv.location };
+        }
+      }
+      return o;
+    });
     return json(res, 200, { orders: list });
 
   } else if (parts[1] === 'orders' && parts[2] && !parts[3]) {

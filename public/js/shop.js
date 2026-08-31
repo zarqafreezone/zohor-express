@@ -5,6 +5,7 @@
 
 let shop = App.load('shop') || null;
 let dashTab = 'orders';
+let lastShopOrderIds = null; // معرفات الطلبات المعلقة في آخر فحص (لتنبيه الطلبية الجديدة)
 
 const el = (id) => document.getElementById(id);
 
@@ -144,6 +145,14 @@ async function refreshOrders() {
   try {
     const d = await App.get('/orders?shop=' + shop.id);
     const orders = d.orders;
+
+    // 🔊 تنبيه مميز عند وصول طلبية جديدة (بانتظار موافقة المحل)
+    const pendingIds = orders.filter((o) => o.status === 'pending').map((o) => o.id);
+    if (lastShopOrderIds && pendingIds.some((id) => !lastShopOrderIds.includes(id))) {
+      ZhSounds.play('shop_new');
+      toast('🔔 وصلتك طلبية جديدة! راجع «طلبات جديدة» بالأعلى', 'ok');
+    }
+    lastShopOrderIds = pendingIds;
 
     // إحصائيات اليوم
     const todayStart = new Date().setHours(0, 0, 0, 0);

@@ -22,6 +22,66 @@ let adsList = [];                                 // الإعلانات النش
 let adIndex = 0;
 let adTimer = null;
 
+/* 🔊 مراقب تنبيهات الزبون: استلام السائق للطلب + وصوله لمنطقتك */
+let statusWatchTimer = null;                      // مؤقت مستقل لا تتأثر به التنقلات
+const lastStatusMap = {};                         // {orderId: آخر حالة شوفناها}
+const arrivalDone = {};                           // {orderId: نبهنا أن السائق وصل؟}
+let custCoords = null;                            // موقع الزبون (لحساب قرب السائق)
+
+function notifyStatusChange(o) {
+  const prev = lastStatusMap[o.id];
+  lastStatusMap[o.id] = o.status;
+  if (!prev || prev === o.status) return;
+  if (o.status === 'picked_up') {
+    ZhSounds.play('pickup');
+    toast('🚀 السائق استلم طلبك وفي الطريق إليك', 'ok');
+  } else if (o.status === 'delivered') {
+    ZhSounds.play('arrived');
+    toast('✅ وصل السائق إليك — تم التوصيل بنجاح', 'ok');
+  }
+}
+
+function ensureCustCoords(cb) {
+  if (custCoords) return cb();
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (p) => { custCoords = { lat: p.coords.latitude, lng: p.coords.longitude }; cb(); },
+    () => { /* بدون إذن الموقع — يكفي تنبيه «تم التوصيل» */ },
+    { enableHighAccuracy: true, maximumAge: 20000, timeout: 8000 }
+  );
+}
+
+// مراقبة دائمة لطلبات الزبون النشطة — تنبيه صوتي فور تغيّر الحالة في أي شاشة
+function startStatusWatch() {
+  if (statusWatchTimer || !me) return;
+  statusWatchTimer = setInterval(async () => {
+    if (!me) return;
+    try {
+      const d = await App.get('/orders?customer=' + me.phone);
+      const seen = {};
+      d.orders.forEach((o) => {
+        seen[o.id] = 1;
+        notifyStatusChange(o);
+        // 📍 تنبيه «السائق وصل منطقتك» حين يقترب 200 متر من موقع الزبون
+        if (o.status === 'picked_up' && o.driverLocation && !arrivalDone[o.id]) {
+          ensureCustCoords(() => {
+            if (arrivalDone[o.id] || !custCoords) return;
+            const m = distMeters(custCoords.lat, custCoords.lng, o.driverLocation.lat, o.driverLocation.lng);
+            if (m <= 200) {
+              arrivalDone[o.id] = true;
+              ZhSounds.play('arrived');
+              toast('📍 السائق وصل منطقتك — استعد للاستلام!', 'ok');
+            }
+          });
+        }
+      });
+      Object.keys(lastStatusMap).forEach((id) => {
+        if (!seen[id]) { delete lastStatusMap[id]; delete arrivalDone[id]; }
+      });
+    } catch { /* تجاهل */ }
+  }, 7000);
+}
+
 /* ---------------- التنقل بين الشاشات ---------------- */
 
 const views = ['login', 'home', 'shop', 'orders', 'track', 'account'];
@@ -489,7 +549,8 @@ async function renderTrack() {
   try {
     const d = await App.get('/orders/' + trackOrderId);
     const o = d.order;
-    const drvLoc = d.driverLocation || null;
+    const drvLoc = d.driverLocation || d.order.driverLocation || null;
+    notifyStatusChange(o); // 🔊 صوت عند الاستلام / عند التوصيل (بلا تكرار مع المراقب العام)
     document.getElementById('hdr-title').textContent = 'طلب #' + o.code;
     document.getElementById('hdr-sub').textContent = STATUS[o.status].label;
 
@@ -682,6 +743,7 @@ document.querySelectorAll('#nav a').forEach((a) => {
 if (me) {
   renderHome();
   refreshBubble();
+  startStatusWatch(); // 🔊 تنبيهات الزبون تعمل في كل الشاشات
 } else {
   renderLogin();
 }

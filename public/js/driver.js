@@ -4,7 +4,7 @@
 'use strict';
 
 let driver = App.load('driver') || null;
-let lastPoolCount = 0;
+let lastPoolIds = null; // معرفات طلبات التجمع في آخر فحص (لتنبيه الطلب الجديد)
 
 const el = (id) => document.getElementById(id);
 
@@ -218,9 +218,13 @@ async function refresh() {
     el('mine-count').textContent = mine.length;
     el('st-active').textContent = mine.length;
 
-    // تنبيه صوتي عند ظهور طلب جديد
-    if (driver.online && pool.length > lastPoolCount && lastPoolCount !== 0) beep();
-    lastPoolCount = pool.length;
+    // 🔊 تنبيه مميز عند ظهور طلب جديد في التجمع
+    const poolIds = pool.map((o) => o.id);
+    if (driver.online && lastPoolIds && poolIds.some((id) => !lastPoolIds.includes(id))) {
+      ZhSounds.play('driver_new');
+      toast('🔔 طلب جديد بانتظارك — اقبله قبل غيرك!', 'ok');
+    }
+    lastPoolIds = poolIds;
 
     // تجمّع الطلبات
     el('pool').innerHTML = pool.length ? pool.map((o) => `
