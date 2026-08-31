@@ -138,7 +138,39 @@ function buildAddress(c) {
   return [c.area, c.street, c.building, c.landmark].filter(Boolean).join(' — ');
 }
 
-/* ---------------- قاعدة البيانات (ملف JSON) ---------------- */
+/* ---------------- أدوات المعرفات (آمنة ضد التكرار) ---------------- */
+
+function existsId(prefix, id) {
+  switch (prefix) {
+    case 's': return !!db.shops.find((x) => x.id === id);
+    case 'd': return !!db.drivers.find((x) => x.id === id);
+    case 'c': return !!db.customers.find((x) => x.id === id);
+    case 'o': return !!db.orders.find((x) => x.id === id);
+    case 'p': return db.shops.some((x) => x.products.some((p) => p.id === id));
+    case 'a': return db.ads.some((x) => x.id === id);
+    default: return false;
+  }
+}
+
+function nextId(prefix) {
+  let id;
+  do {
+    db.seq += 1;
+    id = prefix + db.seq;
+  } while (existsId(prefix, id));
+  return id;
+}
+
+function nextOrderCode() {
+  let code;
+  do {
+    db.orderCode += 1;
+    code = String(db.orderCode);
+  } while (db.orders.some((o) => o.code === code));
+  return code;
+}
+
+/* ---------------- بناء البيانات الأولية ---------------- */
 
 function seedDb() {
   const now = Date.now();
