@@ -294,6 +294,9 @@ async function paintAds() {
       <div class="field"><label>عنوان الإعلان</label><input class="input" id="pp-title" autocomplete="off" value="${escapeHtml(pp.title || '')}"></div>
       <div class="field"><label>النص — كل سطر يظهر مستقلاً داخل الورقة</label><textarea class="input" id="pp-body" rows="3" autocomplete="off">${escapeHtml(pp.body || '')}</textarea></div>
       <div class="field"><label>رقم الهاتف (يظهر بزر اتصال داخل الورقة)</label><input class="input" id="pp-phone" autocomplete="off" dir="ltr" value="${escapeHtml(pp.phone || '')}"></div>
+      <div class="field"><label>🏪 رابط محل داخل الورقة (اختياري — يأخذ الزبون لصفحة محله)</label>
+        <select class="input" id="pp-shop" autocomplete="off"><option value="">بدون رابط محل</option>${shopsRes.shops.map((sh) => '<option value="' + sh.id + '"' + (pp.shopId === sh.id ? ' selected' : '') + '>' + sh.icon + ' ' + escapeHtml(sh.name) + '</option>').join('')}</select>
+      </div>
       <div class="row" style="margin-top:8px">
         <button class="btn ok block" id="btn-pp-save">💾 حفظ</button>
         <button class="btn soft sm" id="btn-pp-preview">👁 معاينة</button>
@@ -336,6 +339,7 @@ async function paintAds() {
     title: el('pp-title').value.trim(),
     body: el('pp-body').value,
     phone: el('pp-phone').value.trim(),
+    shopId: el('pp-shop').value || null,
   });
   el('btn-pp-save').onclick = async () => {
     const v = ppVals();

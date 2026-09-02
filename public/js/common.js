@@ -186,10 +186,18 @@ function showPopupAd(p) {
       '<div class="pbook-orn">✦ ─────── ✦</div>' +
       lines +
       (p.phone ? '<a class="pbook-call" href="tel:' + escapeHtml(p.phone) + '" dir="ltr">📞 ' + escapeHtml(p.phone) + '</a>' : '') +
+      (p.shopId ? '<br><a class="pbook-shop" href="/customer.html">🏪 ' + escapeHtml(p.shopName || 'ادخل صفحة المحل') + ' — تسوّق الآن ←</a>' : '') +
       '<div class="pbook-foot">🌸 من إعلانات الزهور اكسبرس</div>' +
     '</div>';
   const close = () => { try { sessionStorage.setItem('zh_popupSeen', '1'); } catch { /* لا شيء */ } ov.remove(); };
   ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
   ov.querySelector('.pbook-x').onclick = close;
+  const sl = ov.querySelector('.pbook-shop');
+  if (sl) sl.onclick = (e) => {
+    e.preventDefault();
+    try { sessionStorage.setItem('zh_openShop', p.shopId); } catch { /* لا شيء */ }
+    if (typeof openShop === 'function') { close(); openShop(p.shopId); }
+    else location.href = '/customer.html';
+  };
   document.body.appendChild(ov);
 }

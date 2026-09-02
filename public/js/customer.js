@@ -135,6 +135,7 @@ async function doLogin() {
     me = d.customer;
     App.save('customer', me);
     renderHome();
+    if (maybeOpenPendingShop()) return; // كان بالانتظار من إعلان الصفحة الرئيسية
     toast('أهلاً ' + me.name + ' 🌸', 'ok');
   } catch (e) {
     toast(e.message, 'bad');
@@ -429,6 +430,18 @@ function openCheckout() {
       btn.textContent = '✅ تأكيد الطلب';
     }
   };
+}
+
+// فتح محل طُلب من الإعلان المنبثق (حتى من الصفحة الرئيسية) فور توفر جلسة الزبون
+function maybeOpenPendingShop() {
+  let id = null;
+  try { id = sessionStorage.getItem('zh_openShop'); } catch { /* لا شيء */ }
+  if (id && me) {
+    try { sessionStorage.removeItem('zh_openShop'); } catch { /* لا شيء */ }
+    openShop(id);
+    return true;
+  }
+  return false;
 }
 
 /* ---------------- طلباتي (مع تبويبات وإعادة طلب) ---------------- */
@@ -747,6 +760,7 @@ if (me) {
   renderHome();
   refreshBubble();
   startStatusWatch(); // 🔊 تنبيهات الزبون تعمل في كل الشاشات
+  maybeOpenPendingShop(); // 🏪 فتح محل مطلوب من إعلان منبثق سابق
 } else {
   renderLogin();
 }

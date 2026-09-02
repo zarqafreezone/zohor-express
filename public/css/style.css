@@ -801,3 +801,10 @@ input[type="file"]::file-selector-button {
   padding: 4px 12px; border-radius: 999px;
 }
 .ad-shop-link:active { transform: scale(.96); }
+
+.pbook-shop {
+  display: inline-block; margin: 10px 4px 0; padding: 9px 20px;
+  background: #fff; border: 1.5px solid var(--v1); color: var(--v1);
+  font-weight: 800; font-size: 14.5px; border-radius: 999px; text-decoration: none;
+}
+.pbook-shop:active { transform: scale(.96); }

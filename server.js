@@ -110,6 +110,8 @@ const DEFAULT_POPUP = {
   title: 'عرض خاص من سكاي كلين',
   body: 'غسيل عدد 4 حرامات بسعر 10 دنانير\nغسيل متر السجاد 90 قرش',
   phone: '0795072718',
+  shopId: null,
+  shopName: null,
 };
 const TRIAL_DAYS = 14;         // فترة تجريبية مجانية للمحل الجديد
 const SEED_SHOP_PASSWORD = '1234'; // كلمة المرور الافتراضية للمحلات التجريبية
@@ -511,7 +513,11 @@ async function handleApi(req, res, pathname, url) {
     return json(res, 200, { ok: true, app: 'zohor-express', area: db.settings.area });
 
   } else if (m === 'GET' && pathname === '/api/popup') {
-    return json(res, 200, { popup: db.settings.popupAd || DEFAULT_POPUP });
+    // رابط المحل في المنبثق يظهر فقط إن كان المحل حياً وفعّالاً (كما في شريط الإعلانات)
+    const raw = db.settings.popupAd || DEFAULT_POPUP;
+    const sh = raw.shopId ? findShop(raw.shopId) : null;
+    const live = !!(sh && sh.status === 'active' && subActive(sh));
+    return json(res, 200, { popup: { ...raw, shopId: live ? sh.id : null, shopName: live ? sh.name : null } });
 
   } else if (m === 'GET' && pathname === '/api/ads') {
     // رابط المحل في الإعلان يظهر فقط إن كان المحل موجوداً وفعّالاً
@@ -1007,6 +1013,14 @@ async function handleApi(req, res, pathname, url) {
     if (body.title) pp.title = String(body.title).slice(0, 80);
     if (body.body != null) pp.body = String(body.body).slice(0, 400);
     if (body.phone != null) pp.phone = String(body.phone).slice(0, 20);
+    if (body.shopId !== undefined) {
+      if (!body.shopId) { pp.shopId = null; pp.shopName = null; }
+      else {
+        const sh = findShop(body.shopId);
+        if (!sh) return bad(res, 'المحل المختار غير موجود', 404);
+        pp.shopId = sh.id; pp.shopName = sh.name;
+      }
+    }
     saveDb();
     return json(res, 200, { popup: pp });
 
