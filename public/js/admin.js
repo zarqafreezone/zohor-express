@@ -282,6 +282,7 @@ async function paintAds() {
   const d = await App.get('/admin/ads');
   const ppRes = await App.get('/popup');
   const pp = ppRes.popup || {};
+  const shopsRes = await App.get('/shops?all=1').catch(() => ({ shops: [] }));
   el('tab-ads').innerHTML = `
     <div class="section-title">📣 المساحات الإعلانية</div>
     <div class="card" style="border:1.5px dashed var(--v2); margin-bottom:12px">
@@ -302,6 +303,9 @@ async function paintAds() {
       <p class="muted small" style="margin-bottom:10px">تظهر الإعلانات النشطة في الصفحة الرئيسية لجميع الزبائن — مصدر دخل إضافي للتطبيق.</p>
       <div class="field"><label>عنوان الإعلان</label><input class="input" id="ad-title" autocomplete="off" placeholder="مثال: 🥩 عروض لحوم أبو عمر"></div>
       <div class="field"><label>نص الإعلان</label><input class="input" id="ad-body" autocomplete="off" placeholder="مثال: خصم 10% هذا الأسبوع على كل الطلبات"></div>
+      <div class="field"><label>🏪 اسم المحل (اختياري — يظهر في الإعلان كرابط يفتح صفحة محله)</label>
+        <select class="input" id="ad-shop" autocomplete="off"><option value="">بدون رابط محل</option>${shopsRes.shops.map((sh) => '<option value="' + sh.id + '">' + sh.icon + ' ' + escapeHtml(sh.name) + '</option>').join('')}</select>
+      </div>
       <button class="btn block" id="btn-add-ad">➕ نشر الإعلان</button>
     </div>
     ${d.ads.map((a) => `
@@ -310,6 +314,7 @@ async function paintAds() {
         <div class="flex1">
           <h4>${escapeHtml(a.title)} ${a.active ? '<span class="chip ok">معروض</span>' : '<span class="chip gray">متوقف</span>'}</h4>
           <div class="sub">${escapeHtml(a.body)}</div>
+          ${a.shopName ? '<div class="sub">🏪 مرتبط بمحل: <b style="color:var(--v1)">' + escapeHtml(a.shopName) + '</b></div>' : ''}
         </div>
         <button class="btn ${a.active ? 'warn' : 'ok'} sm" data-ad-toggle="${a.id}" data-active="${a.active}">${a.active ? 'إيقاف' : 'عرض'}</button>
         <button class="btn bad sm" data-ad-del="${a.id}">🗑</button>
@@ -321,7 +326,7 @@ async function paintAds() {
     const body = el('ad-body').value.trim();
     if (!title || !body) return toast('اكتب عنواناً ونصاً للإعلان', 'bad');
     try {
-      await App.post('/admin/ads', { title, body });
+      await App.post('/admin/ads', { title, body, shopId: el('ad-shop').value || null });
       toast('نُشر الإعلان 📣', 'ok');
       paintAds();
     } catch (e) { toast(e.message, 'bad'); }

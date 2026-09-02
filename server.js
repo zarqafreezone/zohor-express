@@ -514,7 +514,13 @@ async function handleApi(req, res, pathname, url) {
     return json(res, 200, { popup: db.settings.popupAd || DEFAULT_POPUP });
 
   } else if (m === 'GET' && pathname === '/api/ads') {
-    return json(res, 200, { ads: db.ads.filter((a) => a.active) });
+    // رابط المحل في الإعلان يظهر فقط إن كان المحل موجوداً وفعّالاً
+    const ads = db.ads.filter((a) => a.active).map((a) => {
+      const sh = a.shopId ? findShop(a.shopId) : null;
+      if (sh && sh.status === 'active' && subActive(sh)) return { ...a, shopId: sh.id, shopName: sh.name };
+      return { ...a, shopId: null, shopName: null };
+    });
+    return json(res, 200, { ads });
 
   } else if (m === 'GET' && pathname === '/api/offers') {
     // كل العروض والتخفيضات من المحلات الفعّالة
@@ -992,7 +998,7 @@ async function handleApi(req, res, pathname, url) {
 
   /* ---------- الإعلانات (مساحات إعلانية) ---------- */
   } else if (m === 'GET' && pathname === '/api/admin/ads') {
-    return json(res, 200, { ads: db.ads });
+    return json(res, 200, { ads: db.ads.map((a) => ({ ...a, shopName: a.shopId ? ((findShop(a.shopId) || {}).name || a.shopName || null) : null })) });
 
   } else if (m === 'PATCH' && pathname === '/api/admin/popup') {
     if (!db.settings.popupAd) db.settings.popupAd = { ...DEFAULT_POPUP };
@@ -1005,9 +1011,15 @@ async function handleApi(req, res, pathname, url) {
     return json(res, 200, { popup: pp });
 
   } else if (m === 'POST' && pathname === '/api/admin/ads') {
-    const { title, body: adBody } = body;
+    const { title, body: adBody, shopId } = body;
     if (!title || !adBody) return bad(res, 'عنوان ونص الإعلان مطلوبان');
-    const ad = { id: nextId('a'), title, body: adBody, active: true };
+    let shopName = null;
+    if (shopId) {
+      const sh = findShop(shopId);
+      if (!sh) return bad(res, 'المحل المختار غير موجود', 404);
+      shopName = sh.name;
+    }
+    const ad = { id: nextId('a'), title, body: adBody, active: true, shopId: shopId || null, shopName };
     db.ads.push(ad);
     saveDb();
     return json(res, 200, { ad });
@@ -1019,6 +1031,14 @@ async function handleApi(req, res, pathname, url) {
       if (typeof body.active === 'boolean') ad.active = body.active;
       if (body.title) ad.title = body.title;
       if (body.body) ad.body = body.body;
+      if (body.shopId !== undefined) {
+        if (!body.shopId) { ad.shopId = null; ad.shopName = null; }
+        else {
+          const sh = findShop(body.shopId);
+          if (!sh) return bad(res, 'المحل المختار غير موجود', 404);
+          ad.shopId = sh.id; ad.shopName = sh.name;
+        }
+      }
       saveDb();
       return json(res, 200, { ad });
     }

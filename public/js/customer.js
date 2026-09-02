@@ -172,6 +172,7 @@ function paintAd() {
       <div class="flex1">
         <div class="ad-title">${escapeHtml(a.title)}</div>
         <div class="ad-body">${escapeHtml(a.body)}</div>
+        ${a.shopId && a.shopName ? '<a class="ad-shop-link" href="#" onclick="event.preventDefault(); event.stopPropagation(); openShop(\'' + a.shopId + '\')">🏪 ' + escapeHtml(a.shopName) + ' — ادخل محله ←</a>' : ''}
       </div>
       <span class="ad-next">‹</span>
     </div>`;
