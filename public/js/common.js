@@ -181,6 +181,7 @@ function showPopupAd(p) {
   ov.innerHTML =
     '<div class="pbook" role="dialog" aria-label="إعلان">' +
       '<button class="pbook-x" aria-label="إغلاق الإعلان">✕</button>' +
+      (p.image ? '<img class="pbook-img" src="' + escapeHtml(p.image) + '" alt="">' : '') +
       '<div class="pbook-orn">✦ ─────── ✦</div>' +
       '<h2 class="pbook-title">' + escapeHtml(p.title) + '</h2>' +
       '<div class="pbook-orn">✦ ─────── ✦</div>' +

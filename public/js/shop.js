@@ -254,10 +254,14 @@ function paintProducts() {
   el('tab-products').innerHTML = `
     <div class="card">
       <h3 style="font-size:15px; margin-bottom:10px">➕ إضافة منتج / خدمة</h3>
-      <div class="field"><label>اسم المنتج</label><input class="input" id="pr-name" placeholder="مثال: حليب طازج 1 لتر"></div>
+      <div class="seg2" style="display:flex; gap:8px; margin-bottom:12px">
+        <button type="button" class="btn soft sm block" id="seg-product" style="margin:0">📦 منتج</button>
+        <button type="button" class="btn ghost sm block" id="seg-service" style="margin:0">🛠️ خدمة</button>
+      </div>
+      <div class="field"><label id="pr-name-lbl">اسم المنتج</label><input class="input" id="pr-name" placeholder="مثال: حليب طازج 1 لتر"></div>
       <div class="grid2">
-        <div class="field"><label>السعر (د.أ)</label><input class="input" id="pr-price" type="number" step="0.05" min="0" placeholder="0.00"></div>
-        <div class="field"><label>الوحدة</label><input class="input" id="pr-unit" placeholder="كغ / حبة / خدمة"></div>
+        <div class="field"><label id="pr-price-lbl">السعر (د.أ)</label><input class="input" id="pr-price" type="number" step="0.05" min="0" placeholder="0.00"></div>
+        <div class="field" id="pr-unit-wrap"><label>الوحدة</label><input class="input" id="pr-unit" placeholder="كغ / حبة"></div>
       </div>
       <div class="field">
         <label>📷 اضافة صورة (اختياري — تظهر للزبائن)</label>
@@ -278,7 +282,7 @@ function paintProducts() {
         <div class="product-row" style="${p.available ? '' : 'opacity:.5'}">
           ${p.image ? `<img class="p-thumb" src="${p.image}" alt="">` : `<div class="p-emoji">${p.emoji}</div>`}
           <div class="flex1">
-            <div class="p-name">${escapeHtml(p.name)} ${disc ? `<span class="chip warn">🔥 خصم ${disc}%</span>` : ''}</div>
+            <div class="p-name">${escapeHtml(p.name)} ${p.kind === 'service' ? '<span class="chip info">🛠️ خدمة</span>' : ''} ${disc ? `<span class="chip warn">🔥 خصم ${disc}%</span>` : ''}</div>
             <div class="p-unit">${escapeHtml(p.unit)} •
               ${p.oldPrice ? `<span style="text-decoration:line-through">${App.fmt(p.oldPrice)}</span> ` : ''}
               <b>${App.fmt(p.price)}</b>
@@ -297,6 +301,20 @@ function paintProducts() {
     <button class="btn ghost sm block" id="btn-change-pass" style="margin-bottom:14px">🔑 تغيير الرقم السري</button>
   `;
   el('btn-add-product').onclick = addProduct;
+
+  // تبديل المنتج/الخدمة في نموذج الإضافة
+  let addKind = 'product';
+  const segP = document.getElementById('seg-product'), segS = document.getElementById('seg-service');
+  const paintSeg = () => {
+    segP.className = 'sm block ' + (addKind === 'product' ? 'soft' : 'ghost');
+    segS.className = 'sm block ' + (addKind === 'service' ? 'soft' : 'ghost');
+    el('pr-name-lbl').textContent = addKind === 'service' ? 'اسم الخدمة' : 'اسم المنتج';
+    el('pr-price-lbl').textContent = addKind === 'service' ? 'سعر الخدمة (د.أ)' : 'السعر (د.أ)';
+    el('pr-name').placeholder = addKind === 'service' ? 'مثال: غسيل سجاد — صيانة تكييف — تركيب رفوف' : 'مثال: حليب طازج 1 لتر';
+    document.getElementById('pr-unit-wrap').style.display = addKind === 'service' ? 'none' : '';
+  };
+  segP.onclick = () => { addKind = 'product'; paintSeg(); };
+  segS.onclick = () => { addKind = 'service'; paintSeg(); };
 
   // معاينة صورة المنتج الجديد
   const imgInput = document.getElementById('pr-image');
@@ -381,9 +399,9 @@ async function addProduct() {
   const prev = document.getElementById('pr-img-preview');
   const image = (prev && prev.style.display !== 'none') ? document.getElementById('pr-preview-img').src : null;
   try {
-    const d = await App.post(`/shops/${shop.id}/products`, { name, price, unit, ...(image ? { image } : {}) });
+    const d = await App.post(`/shops/${shop.id}/products`, { name, price, unit, kind: addKind, ...(addKind === 'service' ? { emoji: '🛠️' } : {}), ...(image ? { image } : {}) });
     shop = d.shop; App.save('shop', shop);
-    toast(image ? 'أُضيف المنتج بالصورة ✅📷' : 'أُضيف المنتج ✅', 'ok');
+    toast(addKind === 'service' ? 'أُضيفت الخدمة ✅🛠️' : (image ? 'أُضيف المنتج بالصورة ✅📷' : 'أُضيف المنتج ✅'), 'ok');
     paintProducts();
   } catch (e) { toast(e.message, 'bad'); }
 }

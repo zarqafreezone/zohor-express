@@ -78,13 +78,16 @@ const CATEGORIES = [
   'مطعم',
   'لحوم ومجمدات',
   'خضار وفواكه',
-  'مخبز',
+  'مخبز ومعجنات',
   'موبايلات واكسسوارات وبطاقات شحن',
   'اجهزة كهربائية والكترونيات',
   'صيانة ومقاولات',
   'دراي كلين',
   'مياه شرب',
   'ادوات منزلية',
+  'تنك ماء',
+  'ميكانيكي وكهربائي متنقل',
+  'توصيل ركاب - طلاب - رحلات',
   'أخرى',
 ];
 
@@ -93,7 +96,10 @@ const CATEGORY_ICONS = {
   'مطعم': '🍴',
   'لحوم ومجمدات': '🥩',
   'خضار وفواكه': '🥬',
-  'مخبز': '🥖',
+  'مخبز ومعجنات': '🥖',
+  'تنك ماء': '🚛',
+  'ميكانيكي وكهربائي متنقل': '🧰',
+  'توصيل ركاب - طلاب - رحلات': '🚌',
   'موبايلات واكسسوارات وبطاقات شحن': '📱',
   'اجهزة كهربائية والكترونيات': '💡',
   'صيانة ومقاولات': '🔧',
@@ -110,6 +116,7 @@ const DEFAULT_POPUP = {
   title: 'عرض خاص من سكاي كلين',
   body: 'غسيل عدد 4 حرامات بسعر 10 دنانير\nغسيل متر السجاد 90 قرش',
   phone: '0795072718',
+  image: '/img/ads/skyklean.jpg',
   shopId: null,
   shopName: null,
 };
@@ -122,7 +129,10 @@ const CATEGORY_IMAGES = {
   'مطعم': '/img/shops/restaurant.jpg',
   'لحوم ومجمدات': '/img/shops/butcher.jpg',
   'خضار وفواكه': '/img/shops/vegetables.jpg',
-  'مخبز': '/img/shops/bakery.jpg',
+  'مخبز ومعجنات': '/img/shops/bakery.jpg',
+  'تنك ماء': '/img/shops/watertank.jpg',
+  'ميكانيكي وكهربائي متنقل': '/img/shops/mechanic.jpg',
+  'توصيل ركاب - طلاب - رحلات': '/img/shops/passengers.jpg',
   'موبايلات واكسسوارات وبطاقات شحن': '/img/shops/mobile.jpg',
   'اجهزة كهربائية والكترونيات': '/img/shops/electronics.jpg',
   'صيانة ومقاولات': '/img/shops/maintenance.jpg',
@@ -517,7 +527,8 @@ async function handleApi(req, res, pathname, url) {
     const raw = db.settings.popupAd || DEFAULT_POPUP;
     const sh = raw.shopId ? findShop(raw.shopId) : null;
     const live = !!(sh && sh.status === 'active' && subActive(sh));
-    return json(res, 200, { popup: { ...raw, shopId: live ? sh.id : null, shopName: live ? sh.name : null } });
+    // صورة الورقة: المحفوظة إن وُجدت وإلا صورة سكاي كلين الافتراضية
+    return json(res, 200, { popup: { image: DEFAULT_POPUP.image, ...raw, shopId: live ? sh.id : null, shopName: live ? sh.name : null } });
 
   } else if (m === 'GET' && pathname === '/api/ads') {
     // رابط المحل في الإعلان يظهر فقط إن كان المحل موجوداً وفعّالاً
@@ -647,15 +658,16 @@ async function handleApi(req, res, pathname, url) {
     const shop = findShop(parts[2]);
     if (!shop) return bad(res, 'المحل غير موجود', 404);
     if (m === 'POST') {
-      const { name, price, unit, emoji, image } = body;
-      if (!name || price == null || isNaN(+price) || +price < 0) return bad(res, 'اسم المنتج والسعر مطلوبان');
+      const { name, price, unit, emoji, image, kind } = body;
+      if (!name || price == null || isNaN(+price) || +price < 0) return bad(res, 'الاسم والسعر مطلوبان');
       if (image) {
         if (!String(image).startsWith('data:image/')) return bad(res, 'صورة غير صالحة');
         if (String(image).length > 600000) return bad(res, 'الصورة كبيرة جداً');
       }
       const product = {
         id: nextId('p'), name, price: round2(+price),
-        unit: unit || 'حبة', emoji: emoji || '📦', available: true,
+        unit: unit || (kind === 'service' ? 'خدمة' : 'حبة'), emoji: emoji || '📦', available: true,
+        ...(kind === 'service' ? { kind: 'service' } : {}),
         ...(image ? { image } : {}),
       };
       shop.products.push(product);
@@ -1125,6 +1137,10 @@ dbReady = loadDb().then(() => {
     saveDb();
     console.log('💰 تم تحديث رسوم التوصيل إلى 1 دينار داخل جبل الزهور');
   }
+  // 🏷️ ترقية التصنيفات: مخبز → مخبز ومعجنات (تُطبَّق على القاعدة المحفوظة تلقائياً)
+  let renamed = 0;
+  db.shops.forEach((sh) => { if (sh.category === 'مخبز') { sh.category = 'مخبز ومعجنات'; renamed++; } });
+  if (renamed) { saveDb(); console.log('🏷️ حُدّث تصنيف ' + renamed + ' محل من «مخبز» إلى «مخبز ومعجنات»'); }
 });
 
 const server = http.createServer((req, res) => {

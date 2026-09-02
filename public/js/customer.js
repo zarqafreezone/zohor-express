@@ -6,7 +6,8 @@
 const CAT_IMG = {
   'بقالة': '/img/shops/grocery.jpg', 'مطعم': '/img/shops/restaurant.jpg',
   'لحوم ومجمدات': '/img/shops/butcher.jpg', 'خضار وفواكه': '/img/shops/vegetables.jpg',
-  'مخبز': '/img/shops/bakery.jpg', 'موبايلات واكسسوارات وبطاقات شحن': '/img/shops/mobile.jpg',
+  'مخبز ومعجنات': '/img/shops/bakery.jpg', 'تنك ماء': '/img/shops/watertank.jpg',
+  'ميكانيكي وكهربائي متنقل': '/img/shops/mechanic.jpg', 'توصيل ركاب - طلاب - رحلات': '/img/shops/passengers.jpg', 'موبايلات واكسسوارات وبطاقات شحن': '/img/shops/mobile.jpg',
   'اجهزة كهربائية والكترونيات': '/img/shops/electronics.jpg', 'صيانة ومقاولات': '/img/shops/maintenance.jpg',
   'دراي كلين': '/img/shops/dryclean.jpg', 'مياه شرب': '/img/shops/water.jpg',
   'أخرى': '/img/shops/spices.jpg',
@@ -314,7 +315,7 @@ function renderShopPage() {
       <div class="row between">
         <div>
           <h3 style="font-size:16px">${s.icon} ${escapeHtml(s.name)}</h3>
-          <div class="muted small">${escapeHtml(s.category)} • ${s.products.length} منتج</div>
+          <div class="muted small">${escapeHtml(s.category)} • ${s.products.length} منتج وخدمة</div>
         </div>
         ${s.isOpen
           ? '<span class="badge-open">● مفتوح للاستقبال</span>'
@@ -334,8 +335,8 @@ function renderShopPage() {
         <div class="product-row" style="${p.available ? '' : 'opacity:.45'}">
           ${p.image ? `<img class="p-thumb" src="${p.image}" alt="">` : `<div class="p-emoji">${p.emoji}</div>`}
           <div class="flex1">
-            <div class="p-name">${escapeHtml(p.name)} ${disc ? `<span class="chip warn">🔥 خصم ${disc}%</span>` : ''} ${p.available ? '' : '<span class="chip gray">غير متوفر</span>'}</div>
-            <div class="p-unit">${escapeHtml(p.unit)}</div>
+            <div class="p-name">${escapeHtml(p.name)} ${p.kind === 'service' ? '<span class="chip info">🛠️ خدمة</span>' : ''} ${disc ? `<span class="chip warn">🔥 خصم ${disc}%</span>` : ''} ${p.available ? '' : '<span class="chip gray">غير متوفر</span>'}</div>
+            <div class="p-unit">${p.kind === 'service' ? 'يُطلب كخدمة' : escapeHtml(p.unit)}</div>
           </div>
           <div class="p-price">
             ${disc ? `<span style="display:block; font-size:11px; font-weight:400; color:var(--mut); text-decoration:line-through">${App.fmt(p.oldPrice)}</span>` : ''}
