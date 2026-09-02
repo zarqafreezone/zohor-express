@@ -197,8 +197,19 @@ async function renderDash() {
 async function refresh() {
   if (!driver || document.getElementById('view-dash').style.display === 'none') return;
   try {
-    // تحديث بيانات السائق
-    const dd = await App.get('/drivers/' + driver.id);
+    // تحديث بيانات السائق — إن حُذف الحساب من الإدارة نُخرج السائق بلطف
+    let dd;
+    try { dd = await App.get('/drivers/' + driver.id); }
+    catch (e) {
+      if (String(e.message).includes('غير موجود')) {
+        stopGeo(); stopPoll();
+        App.clear('driver');
+        driver = null;
+        toast('تم حذف حسابك من الإدارة — تواصل معهم للمزيد', 'bad');
+        return renderLogin();
+      }
+      throw e;
+    }
     driver = dd.driver;
     App.save('driver', driver);
     if (driver.status === 'pending' && !driver.docsSubmitted) { stopPoll(); return renderCompletion(); }

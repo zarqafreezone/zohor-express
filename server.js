@@ -369,11 +369,21 @@ function seedDb() {
   return data;
 }
 
+function sanitizeDb() {
+  // حماية من بيانات ناقصة (ترحيل قديم أو قاعدة معدّلة يدوياً):
+  // كل المجموعات يجب أن تكون مصفوفات — وإلا انهارت عمليات الإضافة (مثل نشر الإعلانات)
+  ['shops', 'customers', 'drivers', 'orders', 'ads'].forEach((k) => {
+    if (!Array.isArray(db[k])) db[k] = [];
+  });
+  if (!db.settings || typeof db.settings !== 'object') db.settings = {};
+}
+
 function loadFromLocalFile() {
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     if (fs.existsSync(DB_FILE)) {
       db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+      sanitizeDb();
       return true;
     }
   } catch (e) {
@@ -392,6 +402,7 @@ async function loadDb() {
       const r = await pgPool.query('SELECT data FROM app_state WHERE id = 1');
       if (r.rows.length) {
         db = r.rows[0].data;
+        sanitizeDb();
         console.log('✅ حُمّلت البيانات من السحابة — محلات:', db.shops.length, '| طلبات:', db.orders.length);
         return;
       }
@@ -444,10 +455,11 @@ function readBody(req) {
 }
 
 function publicShop(s) {
+  // 🔒 الخصوصية: حالة المحل (موقوف/معلّق/الاشتراك) لا تُرسل للزبائن إطلاقاً —
+  // المحلات غير الفعّالة تختفي من القائمة ببساطة، وحالتها تُرى من الإدارة وصاحب المحل فقط
   return {
     id: s.id, name: s.name, category: s.category, icon: s.icon, rating: s.rating,
-    isOpen: s.isOpen, status: s.status, productCount: s.products.length,
-    subscriptionActive: !!(s.subscriptionUntil && s.subscriptionUntil > Date.now()),
+    isOpen: s.isOpen, productCount: s.products.length,
     image: s.image || CATEGORY_IMAGES[s.category] || null,
   };
 }
@@ -546,7 +558,7 @@ async function handleApi(req, res, pathname, url) {
     const shops = db.shops
       .filter((s) => all || (s.status === 'active' && subActive(s)))
       .map((s) => all
-        ? { ...publicShop(s), ownerPhone: s.phone, phone2: s.phone2 || '', address: s.address || '' }
+        ? { ...publicShop(s), status: s.status, subscriptionUntil: s.subscriptionUntil || null, ownerPhone: s.phone, phone2: s.phone2 || '', address: s.address || '' }
         : publicShop(s));
     return json(res, 200, { shops, deliveryFee: db.settings.deliveryFee });
 
@@ -598,7 +610,8 @@ async function handleApi(req, res, pathname, url) {
 
   } else if (parts[1] === 'shops' && parts[2] && !parts[3]) {
     const shop = findShop(parts[2]);
-    if (!shop) return bad(res, 'المحل غير موجود', 404);
+    // 🔒 صفحة المحل للزبائن: المحلات غير الفعّالة (موقوفة/اشتراك منتهي) لا تظهر إطلاقاً
+    if (!shop || shop.status !== 'active' || !subActive(shop)) return bad(res, 'المحل غير متاح حالياً', 404);
     if (m === 'GET') return json(res, 200, { shop });
     if (m === 'PATCH') {
       if (typeof body.isOpen === 'boolean') shop.isOpen = body.isOpen;
@@ -858,8 +871,9 @@ async function handleApi(req, res, pathname, url) {
   /* ---------- الإدارة ---------- */
   } else if (m === 'POST' && pathname === '/api/admin/login') {
     if (body.password !== db.settings.adminPassword) return bad(res, 'كلمة المرور غير صحيحة', 401);
-    // رمز جلسة جديد في كل دخول ناجح
-    db.settings.adminToken = crypto.randomBytes(24).toString('hex');
+    // رمز جلسة ثابت: يتولد مرة واحدة فقط ولا يُبطل جلسات أخرى
+    // (نفس الإدارة قد تكون مسجلة من الكمبيوتر والموبايل معاً)
+    if (!db.settings.adminToken) db.settings.adminToken = crypto.randomBytes(24).toString('hex');
     saveDb();
     return json(res, 200, { ok: true, token: db.settings.adminToken });
 
@@ -904,6 +918,13 @@ async function handleApi(req, res, pathname, url) {
       saveDb();
       return json(res, 200, { shop });
     }
+    if (m === 'DELETE') {
+      // حذف المحل نهائياً مع منتجاته — سجل طلباته القديمة يبقى محفوظاً (الأسماء منسوخة فيه)
+      db.shops = db.shops.filter((s) => s.id !== shop.id);
+      saveDb();
+      console.log('🗑 حذف الإدارة المحل:', shop.name);
+      return json(res, 200, { ok: true });
+    }
 
   } else if (m === 'GET' && pathname === '/api/admin/drivers') {
     return json(res, 200, { drivers: db.drivers });
@@ -918,6 +939,44 @@ async function handleApi(req, res, pathname, url) {
       }
       saveDb();
       return json(res, 200, { driver });
+    }
+    if (m === 'DELETE') {
+      // حذف السائق نهائياً — طلباته النشطة تعود لتجمّع الانتظار ليتولاها سائقون آخرون
+      let released = 0;
+      db.orders.forEach((o) => {
+        if (o.driverId === driver.id && ['assigned', 'picked_up'].includes(o.status)) {
+          o.status = 'ready';
+          o.driverId = null;
+          o.driverName = null;
+          pushTimeline(o, 'ready');
+          released++;
+        }
+      });
+      db.drivers = db.drivers.filter((d) => d.id !== driver.id);
+      saveDb();
+      console.log('🗑 حذف الإدارة السائق:', driver.name, '| طلبات أعيدت للانتظار:', released);
+      return json(res, 200, { ok: true, released });
+    }
+
+  /* ---------- الزبائن (إدارة) ---------- */
+  } else if (m === 'GET' && pathname === '/api/admin/customers') {
+    const customers = db.customers.map((c) => ({
+      id: c.id, name: c.name, phone: c.phone, phone2: c.phone2 || '',
+      address: c.address || '',
+      ordersCount: db.orders.filter((o) => o.customerPhone === c.phone).length,
+      createdAt: c.createdAt,
+    }));
+    return json(res, 200, { customers });
+
+  } else if (parts[1] === 'admin' && parts[2] === 'customers' && parts[3]) {
+    const cust = db.customers.find((c) => c.id === parts[3]);
+    if (!cust) return bad(res, 'الزبون غير موجود', 404);
+    if (m === 'DELETE') {
+      // حذف بطاقة الزبون — سجل طلباته يبقى محفوظاً، وإن عاد ليطلب من جديد يُنشأ حساب تلقائي
+      db.customers = db.customers.filter((c) => c.id !== cust.id);
+      saveDb();
+      console.log('🗑 حذفت الإدارة بطاقة زبون:', cust.name);
+      return json(res, 200, { ok: true });
     }
 
   /* ---------- الإعلانات (مساحات إعلانية) ---------- */

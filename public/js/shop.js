@@ -43,7 +43,7 @@ async function renderLogin() {
       <div class="list-link" onclick="askPass('${x.id}','${escapeHtml(x.name).replace(/'/g, '&#39;')}','${x.icon}')">
         <div class="icon">${x.icon}</div>
         <div class="flex1">
-          <h4>${escapeHtml(x.name)} ${x.status === 'pending' ? '<span class="chip warn">قيد المراجعة</span>' : ''} ${x.status === 'blocked' ? '<span class="chip bad">موقوف</span>' : ''} ${x.status === 'active' && x.subscriptionActive === false ? '<span class="chip bad">اشتراك منتهي</span>' : ''}</div>
+          <h4>${escapeHtml(x.name)}</div>
           <div class="sub">${escapeHtml(x.category)}</div>
         </div>
         <span class="muted">دخول ←</span>
@@ -140,8 +140,21 @@ function updateOpenLbl() {
     : 'محلك مغلق — لن يصل أي طلب جديد';
 }
 
+let shopTick = 0; // عدّاد دورات الفحص (لكشف حذف المحل من الإدارة)
+
 async function refreshOrders() {
   if (!shop || document.getElementById('view-dash').style.display === 'none') return;
+  // 🔒 كل ~30 ثانية: هل ما زال المحل موجوداً وفعّالاً؟ إن حُذف أو أُوقف يُخرج صاحبه بلطف
+  if (++shopTick % 6 === 1) {
+    try { await App.get('/shops/' + shop.id); }
+    catch (e) {
+      App.clear('shop'); stopPoll();
+      shop = null;
+      toast('⚠️ محلك غير متاح حالياً — تواصل مع الإدارة', 'bad');
+      renderLogin();
+      return;
+    }
+  }
   try {
     const d = await App.get('/orders?shop=' + shop.id);
     const orders = d.orders;

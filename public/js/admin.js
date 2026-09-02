@@ -41,7 +41,7 @@ function switchTab(t) {
   document.querySelectorAll('#admin-tabs button').forEach((b) => {
     b.classList.toggle('active', b.dataset.tab === t);
   });
-  ['overview', 'shops', 'drivers', 'orders', 'ads'].forEach((x) => {
+  ['overview', 'shops', 'drivers', 'customers', 'orders', 'ads'].forEach((x) => {
     el('tab-' + x).style.display = x === t ? '' : 'none';
   });
   refreshTab();
@@ -52,6 +52,7 @@ async function refreshTab() {
     if (currentTab === 'overview') await paintOverview();
     else if (currentTab === 'shops') await paintShops();
     else if (currentTab === 'drivers') await paintDrivers();
+    else if (currentTab === 'customers') await paintCustomers();
     else if (currentTab === 'orders') await paintOrders();
     else if (currentTab === 'ads') await paintAds();
   } catch (e) {
@@ -131,6 +132,7 @@ async function paintShops() {
           ${s.status !== 'active' ? `<button class="btn ok sm" data-approve="${s.id}">✅ تنشيط</button>` : `<button class="btn warn sm" data-suspend="${s.id}">⏸ إيقاف</button>`}
           <button class="btn soft sm" data-renew="${s.id}">📅 تجديد الاشتراك +30ي</button>
           ${s.status === 'active' ? `<button class="btn ghost sm" data-open="${s.id}">${s.isOpen ? '🔒 إغلاق المحل' : '🔓 فتح المحل'}</button>` : ''}
+          <button class="btn bad sm" data-delshop="${s.id}" title="حذف نهائي">🗑 حذف</button>
         </div>
       </div>
     `; }).join('')}
@@ -164,6 +166,13 @@ function bindShopsButtons() {
       paintShops();
     } catch (e) { toast(e.message, 'bad'); }
   });
+  document.querySelectorAll('[data-delshop]').forEach((b) => b.onclick = async () => {
+    if (!confirm('🗑 حذف هذا المحل نهائياً؟\nسيُزال مع كل منتجاته ولن يستطيع صاحبه الدخول بعدها.\n(سجل طلباته القديمة يبقى محفوظاً)')) return;
+    try {
+      await App.del('/admin/shops/' + b.dataset.delshop);
+      toast('حُذف المحل نهائياً', 'ok'); paintShops();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
 }
 
 /* ---------------- إدارة السائقين ---------------- */
@@ -186,6 +195,7 @@ async function paintDrivers() {
         ${dr.status === 'active'
           ? `<button class="btn warn sm" data-blockdrv="${dr.id}">⏸ إيقاف</button>`
           : `<button class="btn ok sm" data-unblockdrv="${dr.id}">✅ تنشيط</button>`}
+        <button class="btn bad sm" data-deldrv="${dr.id}" title="حذف نهائي">🗑</button>
       </div>
     `).join('') : '<div class="card"><div class="empty">لا سائقين بعد</div></div>'}
   `;
@@ -199,6 +209,42 @@ async function paintDrivers() {
     try {
       await App.patch('/admin/drivers/' + b.dataset.unblockdrv, { status: 'active' });
       toast('نُشّط السائق ✅', 'ok'); paintDrivers();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
+  document.querySelectorAll('[data-deldrv]').forEach((b) => b.onclick = async () => {
+    if (!confirm('🗑 حذف هذا السائق نهائياً؟\nطلباته النشطة ستعود تلقائياً لتجمّع الانتظار ليقبلها سائق آخر.')) return;
+    try {
+      const r = await App.del('/admin/drivers/' + b.dataset.deldrv);
+      toast('حُذف السائق' + (r.released ? ' — وأُعيد ' + r.released + ' طلبات للانتظار' : ''), 'ok'); paintDrivers();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
+}
+
+/* ---------------- الزبائن ---------------- */
+
+async function paintCustomers() {
+  const d = await App.get('/admin/customers');
+  const cs = d.customers || [];
+  el('tab-customers').innerHTML = `
+    <div class="section-title">🧍 الزبائن <span class="count">${cs.length}</span></div>
+    <p class="muted small" style="margin-bottom:8px">💡 الحذف يزيل بطاقة الزبون فقط — سجل طلباته يبقى، وإن عاد ليطلب يُنشأ حسابه تلقائياً من رقمه</p>
+    ${cs.length ? cs.map((c) => `
+      <div class="card mng-row">
+        <div class="icon">🧍</div>
+        <div class="flex1">
+          <h4>${escapeHtml(c.name)}</h4>
+          <div class="sub">📱 <span dir="ltr">${escapeHtml(c.phone)}</span>${c.phone2 ? ' • 📲 <span dir="ltr">' + escapeHtml(c.phone2) + '</span>' : ''} • 🧾 ${c.ordersCount} طلب</div>
+          <div class="sub">📍 ${escapeHtml(c.address || '—')}</div>
+        </div>
+        <button class="btn bad sm" data-delcust="${c.id}" title="حذف نهائي">🗑</button>
+      </div>
+    `).join('') : '<div class="card"><div class="empty">لا زبائن بعد</div></div>'}
+  `;
+  document.querySelectorAll('[data-delcust]').forEach((b) => b.onclick = async () => {
+    if (!confirm('🗑 حذف بطاقة هذا الزبون؟\n(سجل طلباته يبقى محفوظاً)')) return;
+    try {
+      await App.del('/admin/customers/' + b.dataset.delcust);
+      toast('حُذفت بطاقة الزبون', 'ok'); paintCustomers();
     } catch (e) { toast(e.message, 'bad'); }
   });
 }
