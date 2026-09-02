@@ -1002,6 +1002,23 @@ async function handleApi(req, res, pathname, url) {
       return json(res, 200, { ok: true });
     }
 
+  } else if (m === 'GET' && pathname === '/api/admin/offers') {
+    // كل التخفيضات النشطة — والإدارة ترى حتى المخفية (بمحلات موقوفة/منتهية الاشتراك)
+    const offers = [];
+    db.shops.forEach((sh) => (sh.products || []).forEach((p) => {
+      if (p.oldPrice && p.oldPrice > p.price) {
+        offers.push({
+          productId: p.id, shopId: sh.id, shopName: sh.name, shopIcon: sh.icon,
+          shopLive: sh.status === 'active' && subActive(sh),
+          name: p.name, emoji: p.emoji, unit: p.unit,
+          price: p.price, oldPrice: p.oldPrice,
+          discount: Math.round((1 - p.price / p.oldPrice) * 100),
+        });
+      }
+    }));
+    offers.sort((a, b) => b.discount - a.discount);
+    return json(res, 200, { offers });
+
   /* ---------- الإعلانات (مساحات إعلانية) ---------- */
   } else if (m === 'GET' && pathname === '/api/admin/ads') {
     return json(res, 200, { ads: db.ads.map((a) => ({ ...a, shopName: a.shopId ? ((findShop(a.shopId) || {}).name || a.shopName || null) : null })) });

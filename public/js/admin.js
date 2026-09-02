@@ -41,7 +41,7 @@ function switchTab(t) {
   document.querySelectorAll('#admin-tabs button').forEach((b) => {
     b.classList.toggle('active', b.dataset.tab === t);
   });
-  ['overview', 'shops', 'drivers', 'customers', 'orders', 'ads'].forEach((x) => {
+  ['overview', 'shops', 'drivers', 'customers', 'orders', 'offers', 'ads'].forEach((x) => {
     el('tab-' + x).style.display = x === t ? '' : 'none';
   });
   refreshTab();
@@ -57,6 +57,7 @@ async function refreshTab() {
     else if (currentTab === 'drivers') await paintDrivers();
     else if (currentTab === 'customers') await paintCustomers();
     else if (currentTab === 'orders') await paintOrders();
+    else if (currentTab === 'offers') await paintOffers();
     else if (currentTab === 'ads') await paintAds();
   } catch (e) {
     if (String(e.message).includes('غير مصرح')) {
@@ -274,6 +275,40 @@ async function paintOrders() {
       </div>
     `).join('') : '<div class="card"><div class="empty" style="padding:14px">لا طلبات بعد</div></div>'}
   `;
+}
+
+/* ---------------- العروض والتخفيضات ---------------- */
+
+async function paintOffers() {
+  const d = await App.get('/admin/offers');
+  const of = d.offers || [];
+  const live = of.filter((x) => x.shopLive);
+  const C = [];
+  C.push('    <div class="section-title">🔥 عروض وتخفيضات <span class="count">' + of.length + '</span></div>');
+  C.push('    <div class="card" style="display:flex; gap:10px; margin-bottom:10px">');
+  C.push('      <div class="flex1" style="text-align:center"><div style="font-size:22px; font-weight:900; color:var(--ok)">' + live.length + '</div><div class="muted small">ظاهرة للزبائن الآن</div></div>');
+  C.push('      <div class="flex1" style="text-align:center"><div style="font-size:22px; font-weight:900; color:var(--warn)">' + (of.length - live.length) + '</div><div class="muted small">مخفية (محل موقوف/منتهي)</div></div>');
+  C.push('    </div>');
+  C.push('    <p class="muted small" style="margin-bottom:8px">💡 العروض ينشئها أصحاب المحلات بزر «🏷️ تخفيض» — ومن هنا تلغي أي عرض فيعود المنتج لسعره الأصلي</p>');
+  C.push(of.length ? of.map((x) => `
+      <div class="card mng-row">
+        <div class="p-emoji">${x.emoji}</div>
+        <div class="flex1">
+          <h4>${escapeHtml(x.name)} <span class="chip warn">🔥 -${x.discount}%</span> ${x.shopLive ? '' : '<span class="chip gray">مخفي — المحل غير فعّال</span>'}</h4>
+          <div class="sub">${x.shopIcon} ${escapeHtml(x.shopName)} • ${escapeHtml(x.unit)}</div>
+          <div class="sub"><span style="text-decoration:line-through">${App.fmt(x.oldPrice)}</span> ← <b style="color:var(--ok)">${App.fmt(x.price)}</b></div>
+        </div>
+        <button class="btn warn sm" data-unoffer="${x.productId}" data-shop="${x.shopId}">إلغاء العرض</button>
+      </div>
+    `).join('') : '<div class="card"><div class="empty">لا عروض حالياً</div></div>');
+  el('tab-offers').innerHTML = C.join('');
+  document.querySelectorAll('[data-unoffer]').forEach((b) => b.onclick = async () => {
+    if (!confirm('إلغاء هذا العرض؟ سيعود المنتج لسعره الأصلي فوراً')) return;
+    try {
+      await App.patch('/shops/' + b.dataset.shop + '/products/' + b.dataset.unoffer, { oldPrice: null });
+      toast('أُلغي العرض — عاد المنتج لسعره الأصلي', 'ok'); paintOffers();
+    } catch (e) { toast(e.message, 'bad'); }
+  });
 }
 
 /* ---------------- الإعلانات ---------------- */

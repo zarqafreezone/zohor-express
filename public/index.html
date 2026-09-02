@@ -20,6 +20,7 @@
     <h1>الزهور اكسبرس</h1>
     <p>يربط المحلات بالزبائن والسائقين في دقائق 🌸</p>
     <p style="margin-top:6px; font-size:13px; opacity:0.75">📍 منطقة جبل الزهور</p>
+    <button class="install-btn" id="btn-install">📲 تحميل التطبيق</button>
   </div>
 
   <div class="container">
@@ -100,6 +101,52 @@
     fetch('/api/popup').then((r) => r.json()).then((d) => {
       if (d.popup && d.popup.active) setTimeout(() => showPopupAd(d.popup), 700);
     }).catch(() => {});
+  })();
+  </script>
+
+  <script>
+  // 📲 زر «تحميل التطبيق» — تثبيت حقيقي PWA أو تعليمات حسب الجهاز
+  (function () {
+    var btn = document.getElementById('btn-install');
+    var deferred = null;
+    var standalone = false;
+    try { standalone = window.matchMedia('(display-mode: standalone)').matches; } catch (e) {}
+    var iOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      deferred = e;
+    });
+    window.addEventListener('appinstalled', function () {
+      btn.style.display = 'none';
+    });
+    if (standalone) { btn.style.display = 'none'; return; }
+
+    btn.onclick = function () {
+      if (deferred) {
+        deferred.prompt();
+        deferred.userChoice.then(function (r) {
+          if (r && r.outcome === 'accepted') btn.style.display = 'none';
+          deferred = null;
+        });
+        return;
+      }
+      // لا يوجد تثبيت تلقائي (آيفون غالباً) → تعليمات واضحة
+      var steps = iOS
+        ? '<div class="inst-step"><span class="n">1</span><div>اضغط زر <b>المشاركة</b> <span style="font-size:18px">⎋</span> أسفل شريح سفاري</div></div>' +
+          '<div class="inst-step"><span class="n">2</span><div>اختر <b>«Add to Home Screen»</b> أضف إلى الشاشة الرئيسية</div></div>' +
+          '<div class="inst-step"><span class="n">3</span><div>اضغط <b>إضافة</b> — وستظهر أيقونة الزهور اكسبرس في جهازك 🌸</div></div>'
+        : '<div class="inst-step"><span class="n">1</span><div>افتح قائمة المتصفح <b>⋮</b> (أعلى الزاوية)</div></div>' +
+          '<div class="inst-step"><span class="n">2</span><div>اختر <b>«تثبيت التطبيق»</b> أو «Add to Home screen»</div></div>' +
+          '<div class="inst-step"><span class="n">3</span><div>أكّد — وسينزل التطبيق بأيقونته إلى جهازك 🌸</div></div>';
+      var ov = openSheet(
+        '<h3>📲 حمّل تطبيق الزهور اكسبرس</h3>' +
+        '<p class="muted small" style="margin-bottom:10px">دقيقة واحدة ويصير التطبيق في جهازك — أسرع وأخف من أي متجر</p>' +
+        steps +
+        '<button class="btn block" onclick="closeSheet()">فهمت ✅</button>'
+      );
+    };
   })();
   </script>
 
