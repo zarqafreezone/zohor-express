@@ -808,3 +808,25 @@ input[type="file"]::file-selector-button {
   font-weight: 800; font-size: 14.5px; border-radius: 999px; text-decoration: none;
 }
 .pbook-shop:active { transform: scale(.96); }
+
+/* ---------------- هوية الزهور اكسبرس (الشعار) ---------------- */
+.top-brand { width: 34px; height: 34px; border-radius: 10px; display: block;
+  filter: drop-shadow(0 2px 5px rgba(76, 29, 149, 0.25)); }
+.hero-mark { width: 74px; height: 74px; border-radius: 20px; display: block; margin: 0 auto 6px;
+  filter: drop-shadow(0 10px 26px rgba(10, 4, 30, 0.5));
+  animation: hmFloat 3.5s ease-in-out infinite; }
+@keyframes hmFloat { 50% { transform: translateY(-6px) } }
+.hero-brand { position: relative; width: 86px; margin: 0 auto 10px; }
+.hero-brand img { width: 86px; height: 86px; border-radius: 24px; display: block;
+  filter: drop-shadow(0 10px 24px rgba(76, 29, 149, 0.30)); }
+.hero-brand .badge {
+  position: absolute; bottom: -8px; left: -8px; width: 34px; height: 34px;
+  background: linear-gradient(135deg, var(--v1), var(--v2)); color: #fff;
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  font-size: 17px; border: 2.5px solid #fff; box-shadow: 0 4px 12px rgba(76, 29, 149, 0.35);
+}
+.pbook-mark { width: 20px; height: 20px; border-radius: 6px; vertical-align: -5px; margin-inline-end: 4px; }
+
+.brand-sign { text-align: center; margin: 26px auto 8px; opacity: .95; }
+.brand-sign img { width: 128px; height: 128px; border-radius: 28px; box-shadow: 0 12px 34px rgba(76, 29, 149, 0.22); }
+.brand-sign p { margin-top: 8px; font-size: 12.5px; color: var(--mut); font-weight: 700; }

@@ -187,7 +187,7 @@ function showPopupAd(p) {
       lines +
       (p.phone ? '<a class="pbook-call" href="tel:' + escapeHtml(p.phone) + '" dir="ltr">📞 ' + escapeHtml(p.phone) + '</a>' : '') +
       (p.shopId ? '<br><a class="pbook-shop" href="/customer.html">🏪 ' + escapeHtml(p.shopName || 'ادخل صفحة المحل') + ' — تسوّق الآن ←</a>' : '') +
-      '<div class="pbook-foot">🌸 من إعلانات الزهور اكسبرس</div>' +
+      '<div class="pbook-foot"><img class="pbook-mark" src="/img/brand/mark-256.png" alt=""> من إعلانات الزهور اكسبرس</div>' +
     '</div>';
   const close = () => { try { sessionStorage.setItem('zh_popupSeen', '1'); } catch { /* لا شيء */ } ov.remove(); };
   ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
