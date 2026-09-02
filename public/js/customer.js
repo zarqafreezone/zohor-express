@@ -21,6 +21,7 @@ let activeCat = 'الكل';                           // التصنيف المخ
 let adsList = [];                                 // الإعلانات النشطة
 let adIndex = 0;
 let adTimer = null;
+let DELIVERY_FEE = 1;                             // رسوم التوصيل (تُجلب من الخادم)
 
 /* 🔊 مراقب تنبيهات الزبون: استلام السائق للطلب + وصوله لمنطقتك */
 let statusWatchTimer = null;                      // مؤقت مستقل لا تتأثر به التنقلات
@@ -193,6 +194,7 @@ async function renderHome() {
   try {
     const d = await App.get('/shops');
     allShops = d.shops;
+    if (d.deliveryFee) DELIVERY_FEE = +d.deliveryFee; // رسوم التوصيل الرسمية من الخادم
     document.getElementById('shops-count').textContent = allShops.length;
 
     // بناء تبويبات التصنيفات الموجودة فعلياً
@@ -369,7 +371,7 @@ function openCheckout() {
   if (!me || !currentShop) return;
   const count = cartCount(currentShop.id);
   const sub = cartSubtotal(currentShop.id);
-  const fee = 0.5;
+  const fee = DELIVERY_FEE;
   openSheet(`
     <h3>🧾 إتمام الطلب — ${escapeHtml(currentShop.name)}</h3>
     <div class="field">

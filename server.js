@@ -187,7 +187,7 @@ function seedDb() {
     orderCode: 2000,
     settings: {
       adminPassword: 'Zohor@2026',
-      deliveryFee: 0.5,
+      deliveryFee: 1,
       area: 'منطقة جبل الزهور',
       subscriptionFee: SUBSCRIPTION_FEE,
       orderCommission: ORDER_COMMISSION,
@@ -548,7 +548,7 @@ async function handleApi(req, res, pathname, url) {
       .map((s) => all
         ? { ...publicShop(s), ownerPhone: s.phone, phone2: s.phone2 || '', address: s.address || '' }
         : publicShop(s));
-    return json(res, 200, { shops });
+    return json(res, 200, { shops, deliveryFee: db.settings.deliveryFee });
 
   } else if (m === 'POST' && pathname === '/api/shops/register') {
     const { name, owner, phone, category, phone2, area, street, landmark } = body;
@@ -985,7 +985,16 @@ function serveStatic(res, pathname) {
 
 /* ---------------- التشغيل ---------------- */
 
-dbReady = loadDb();
+dbReady = loadDb().then(() => {
+  // 💰 ترقية رسوم التوصيل: 1 دينار داخل جبل الزهور — تُطبَّق مرة واحدة على القاعدة المحفوظة
+  // (لتغيير الرسوم مستقبلاً: عدّل القيمة هنا ورفع رقم feeVersion)
+  if (db.settings.feeVersion !== 2) {
+    db.settings.deliveryFee = 1;
+    db.settings.feeVersion = 2;
+    saveDb();
+    console.log('💰 تم تحديث رسوم التوصيل إلى 1 دينار داخل جبل الزهور');
+  }
+});
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
