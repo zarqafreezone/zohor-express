@@ -48,6 +48,9 @@ function switchTab(t) {
 }
 
 async function refreshTab() {
+  // 🛡️ لا تُعد رسم اللوحة أثناء كتابة المستخدم في أي حقل — حتى لا يُمحى ما كتبه
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && ae.closest('#view-dash')) return;
   try {
     if (currentTab === 'overview') await paintOverview();
     else if (currentTab === 'shops') await paintShops();
@@ -287,9 +290,9 @@ async function paintAds() {
       <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-weight:700; font-size:13.5px">
         <input type="checkbox" id="pp-active" ${pp.active ? 'checked' : ''}> مُفعّل — يظهر للزبائن
       </label>
-      <div class="field"><label>عنوان الإعلان</label><input class="input" id="pp-title" value="${escapeHtml(pp.title || '')}"></div>
-      <div class="field"><label>النص — كل سطر يظهر مستقلاً داخل الورقة</label><textarea class="input" id="pp-body" rows="3">${escapeHtml(pp.body || '')}</textarea></div>
-      <div class="field"><label>رقم الهاتف (يظهر بزر اتصال داخل الورقة)</label><input class="input" id="pp-phone" dir="ltr" value="${escapeHtml(pp.phone || '')}"></div>
+      <div class="field"><label>عنوان الإعلان</label><input class="input" id="pp-title" autocomplete="off" value="${escapeHtml(pp.title || '')}"></div>
+      <div class="field"><label>النص — كل سطر يظهر مستقلاً داخل الورقة</label><textarea class="input" id="pp-body" rows="3" autocomplete="off">${escapeHtml(pp.body || '')}</textarea></div>
+      <div class="field"><label>رقم الهاتف (يظهر بزر اتصال داخل الورقة)</label><input class="input" id="pp-phone" autocomplete="off" dir="ltr" value="${escapeHtml(pp.phone || '')}"></div>
       <div class="row" style="margin-top:8px">
         <button class="btn ok block" id="btn-pp-save">💾 حفظ</button>
         <button class="btn soft sm" id="btn-pp-preview">👁 معاينة</button>
@@ -297,8 +300,8 @@ async function paintAds() {
     </div>
     <div class="card">
       <p class="muted small" style="margin-bottom:10px">تظهر الإعلانات النشطة في الصفحة الرئيسية لجميع الزبائن — مصدر دخل إضافي للتطبيق.</p>
-      <div class="field"><label>عنوان الإعلان</label><input class="input" id="ad-title" placeholder="مثال: 🥩 عروض لحوم أبو عمر"></div>
-      <div class="field"><label>نص الإعلان</label><input class="input" id="ad-body" placeholder="مثال: خصم 10% هذا الأسبوع على كل الطلبات"></div>
+      <div class="field"><label>عنوان الإعلان</label><input class="input" id="ad-title" autocomplete="off" placeholder="مثال: 🥩 عروض لحوم أبو عمر"></div>
+      <div class="field"><label>نص الإعلان</label><input class="input" id="ad-body" autocomplete="off" placeholder="مثال: خصم 10% هذا الأسبوع على كل الطلبات"></div>
       <button class="btn block" id="btn-add-ad">➕ نشر الإعلان</button>
     </div>
     ${d.ads.map((a) => `

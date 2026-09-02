@@ -26,14 +26,14 @@
       <h2>دخول المشرف</h2>
       <p>أدخل كلمة مرور الإدارة للوصول إلى لوحة التحكم</p>
     </div>
-    <div class="card">
+    <form class="card" id="login-form" autocomplete="off" onsubmit="return false">
       <div class="field">
         <label>كلمة المرور</label>
-        <input class="input" id="in-pass" type="password" placeholder="••••••••">
+        <input class="input" id="in-pass" type="password" autocomplete="current-password" placeholder="••••••••">
       </div>
-      <button class="btn block" id="btn-login">دخول</button>
+      <button class="btn block" id="btn-login" type="button">دخول</button>
       <p class="muted small" style="margin-top:10px">🔐 كلمة المرور لدى مالك التطبيق فقط</p>
-    </div>
+    </form>
   </div>
 
   <!-- اللوحة -->
