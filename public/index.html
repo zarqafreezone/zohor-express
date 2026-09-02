@@ -83,5 +83,16 @@
 
   </div>
 
+  <script src="/js/common.js?v=9"></script>
+  <script>
+  // الإعلان المنبثق — مرة واحدة في كل زيارة (جلسة)
+  (function () {
+    try { if (sessionStorage.getItem('zh_popupSeen')) return; } catch { /* لا شيء */ }
+    fetch('/api/popup').then((r) => r.json()).then((d) => {
+      if (d.popup && d.popup.active) setTimeout(() => showPopupAd(d.popup), 700);
+    }).catch(() => {});
+  })();
+  </script>
+
 </body>
 </html>

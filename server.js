@@ -103,6 +103,14 @@ const CATEGORY_ICONS = {
 
 const SUBSCRIPTION_FEE = 10;   // دينار شهرياً من المحل
 const ORDER_COMMISSION = 0.2;  // 20 قرش على كل طلب
+
+// الإعلان المنبثق الافتراضي (يظهر كورقة كتاب ببداية دخول الموقع) — قابل للتعديل من الإدارة
+const DEFAULT_POPUP = {
+  active: true,
+  title: 'عرض خاص من سكاي كلين',
+  body: 'غسيل عدد 4 حرامات بسعر 10 دنانير\nغسيل متر السجاد 90 قرش',
+  phone: '0795072718',
+};
 const TRIAL_DAYS = 14;         // فترة تجريبية مجانية للمحل الجديد
 const SEED_SHOP_PASSWORD = '1234'; // كلمة المرور الافتراضية للمحلات التجريبية
 
@@ -501,6 +509,9 @@ async function handleApi(req, res, pathname, url) {
   /* ---------- عام ---------- */
   if (m === 'GET' && pathname === '/api/health') {
     return json(res, 200, { ok: true, app: 'zohor-express', area: db.settings.area });
+
+  } else if (m === 'GET' && pathname === '/api/popup') {
+    return json(res, 200, { popup: db.settings.popupAd || DEFAULT_POPUP });
 
   } else if (m === 'GET' && pathname === '/api/ads') {
     return json(res, 200, { ads: db.ads.filter((a) => a.active) });
@@ -982,6 +993,16 @@ async function handleApi(req, res, pathname, url) {
   /* ---------- الإعلانات (مساحات إعلانية) ---------- */
   } else if (m === 'GET' && pathname === '/api/admin/ads') {
     return json(res, 200, { ads: db.ads });
+
+  } else if (m === 'PATCH' && pathname === '/api/admin/popup') {
+    if (!db.settings.popupAd) db.settings.popupAd = { ...DEFAULT_POPUP };
+    const pp = db.settings.popupAd;
+    if (typeof body.active === 'boolean') pp.active = body.active;
+    if (body.title) pp.title = String(body.title).slice(0, 80);
+    if (body.body != null) pp.body = String(body.body).slice(0, 400);
+    if (body.phone != null) pp.phone = String(body.phone).slice(0, 20);
+    saveDb();
+    return json(res, 200, { popup: pp });
 
   } else if (m === 'POST' && pathname === '/api/admin/ads') {
     const { title, body: adBody } = body;

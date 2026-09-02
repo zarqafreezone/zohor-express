@@ -167,3 +167,29 @@ function fileToDataUrl(file, maxSize, quality) {
     reader.readAsDataURL(file);
   });
 }
+
+/* ============================================================
+   الإعلان المنبثق — نافذة «ورقة كتاب» أنيقة ببداية دخول الموقع
+   يتحكم بها من لوحة الإدارة (تبويب الإعلانات) مع زر معاينة
+   ============================================================ */
+function showPopupAd(p) {
+  if (!p || !p.title) return;
+  const ov = document.createElement('div');
+  ov.className = 'pbook-ov';
+  const lines = String(p.body || '').split('\n').filter((x) => x.trim())
+    .map((l) => '<div class="pbook-line">' + escapeHtml(l) + '</div>').join('');
+  ov.innerHTML =
+    '<div class="pbook" role="dialog" aria-label="إعلان">' +
+      '<button class="pbook-x" aria-label="إغلاق الإعلان">✕</button>' +
+      '<div class="pbook-orn">✦ ─────── ✦</div>' +
+      '<h2 class="pbook-title">' + escapeHtml(p.title) + '</h2>' +
+      '<div class="pbook-orn">✦ ─────── ✦</div>' +
+      lines +
+      (p.phone ? '<a class="pbook-call" href="tel:' + escapeHtml(p.phone) + '" dir="ltr">📞 ' + escapeHtml(p.phone) + '</a>' : '') +
+      '<div class="pbook-foot">🌸 من إعلانات الزهور اكسبرس</div>' +
+    '</div>';
+  const close = () => { try { sessionStorage.setItem('zh_popupSeen', '1'); } catch { /* لا شيء */ } ov.remove(); };
+  ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+  ov.querySelector('.pbook-x').onclick = close;
+  document.body.appendChild(ov);
+}

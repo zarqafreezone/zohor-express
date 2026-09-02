@@ -277,8 +277,24 @@ async function paintOrders() {
 
 async function paintAds() {
   const d = await App.get('/admin/ads');
+  const ppRes = await App.get('/popup');
+  const pp = ppRes.popup || {};
   el('tab-ads').innerHTML = `
     <div class="section-title">📣 المساحات الإعلانية</div>
+    <div class="card" style="border:1.5px dashed var(--v2); margin-bottom:12px">
+      <h3 style="font-size:15px; margin-bottom:2px">🪟 الإعلان المنبثق — نافذة بداية الدخول</h3>
+      <p class="muted small" style="margin-bottom:10px">يظهر كورقة كتاب أنيقة عند فتح الصفحة الرئيسية أمام كل الزبائن</p>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-weight:700; font-size:13.5px">
+        <input type="checkbox" id="pp-active" ${pp.active ? 'checked' : ''}> مُفعّل — يظهر للزبائن
+      </label>
+      <div class="field"><label>عنوان الإعلان</label><input class="input" id="pp-title" value="${escapeHtml(pp.title || '')}"></div>
+      <div class="field"><label>النص — كل سطر يظهر مستقلاً داخل الورقة</label><textarea class="input" id="pp-body" rows="3">${escapeHtml(pp.body || '')}</textarea></div>
+      <div class="field"><label>رقم الهاتف (يظهر بزر اتصال داخل الورقة)</label><input class="input" id="pp-phone" dir="ltr" value="${escapeHtml(pp.phone || '')}"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ok block" id="btn-pp-save">💾 حفظ</button>
+        <button class="btn soft sm" id="btn-pp-preview">👁 معاينة</button>
+      </div>
+    </div>
     <div class="card">
       <p class="muted small" style="margin-bottom:10px">تظهر الإعلانات النشطة في الصفحة الرئيسية لجميع الزبائن — مصدر دخل إضافي للتطبيق.</p>
       <div class="field"><label>عنوان الإعلان</label><input class="input" id="ad-title" placeholder="مثال: 🥩 عروض لحوم أبو عمر"></div>
@@ -306,6 +322,25 @@ async function paintAds() {
       toast('نُشر الإعلان 📣', 'ok');
       paintAds();
     } catch (e) { toast(e.message, 'bad'); }
+  };
+  const ppVals = () => ({
+    active: el('pp-active').checked,
+    title: el('pp-title').value.trim(),
+    body: el('pp-body').value,
+    phone: el('pp-phone').value.trim(),
+  });
+  el('btn-pp-save').onclick = async () => {
+    const v = ppVals();
+    if (!v.title || !v.body.trim()) return toast('اكتب عنواناً ونصاً للإعلان المنبثق', 'bad');
+    try {
+      await App.patch('/admin/popup', v);
+      toast('حُفظ الإعلان المنبثق ✅', 'ok');
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+  el('btn-pp-preview').onclick = () => {
+    const v = ppVals();
+    if (!v.title) return toast('اكتب العنوان أولاً لترى المعاينة', 'bad');
+    showPopupAd(v);
   };
   document.querySelectorAll('[data-ad-toggle]').forEach((b) => b.onclick = async () => {
     try {
