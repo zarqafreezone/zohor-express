@@ -95,6 +95,8 @@ async function paintOverview() {
       <div class="stat"><div class="num">${s.onlineDrivers}<span class="muted small">/${s.totalDrivers}</span></div><div class="lbl">سائقون متاحون</div></div>
       <div class="stat"><div class="num">${s.totalCustomers}</div><div class="lbl">زبائن مسجلون</div></div>
       <div class="stat"><div class="num">${s.activeAds}</div><div class="lbl">إعلانات معروضة</div></div>
+      <div class="stat" style="background:linear-gradient(135deg,#312e81,#4c1d95); color:#fff"><div class="num" style="color:#fff">${s.visits.toLocaleString('ar')}</div><div class="lbl" style="color:#e9e4ff">👁️ زوار الصفحة الرئيسية</div></div>
+      <div class="stat" style="background:linear-gradient(135deg,#312e81,#4c1d95); color:#fff"><div class="num" style="color:#fff">${s.installs.toLocaleString('ar')}</div><div class="lbl" style="color:#e9e4ff">📲 تحميلات التطبيق</div></div>
       ${s.pendingShops ? `<div class="stat" style="border:1.5px solid var(--warn)"><div class="num" style="color:var(--warn)">${s.pendingShops}</div><div class="lbl">⏳ طلبات انضمام بحاجة موافقة</div></div>` : ''}
     </div>
 

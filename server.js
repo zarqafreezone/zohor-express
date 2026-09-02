@@ -947,6 +947,8 @@ async function handleApi(req, res, pathname, url) {
         commissionsTotal: round2(billable.length * db.settings.orderCommission),
         platformRevenue: round2(activeShops.length * db.settings.subscriptionFee + billable.length * db.settings.orderCommission),
         activeAds: db.ads.filter((a) => a.active).length,
+        visits: (db.settings.stats && db.settings.stats.visits) || 0,
+        installs: (db.settings.stats && db.settings.stats.installs) || 0,
       },
       latestOrders: db.orders.slice().sort((a, b) => b.createdAt - a.createdAt).slice(0, 8),
     });
@@ -1125,6 +1127,22 @@ const MIME = {
 
 function serveStatic(res, pathname) {
   let file = pathname === '/' ? '/index.html' : pathname;
+  // 📊 عدّاد الزوار: زيارة للصفحة الرئيسية فقط (جلسة كل 30 دقيقة — لا نضاعف بتحديث الصفحة المتكرر)
+  if (file === '/index.html') {
+    try {
+      if (!db.settings.stats) db.settings.stats = { visits: 0, installs: 0 };
+      db.settings.stats.visits++;
+      saveDb();
+    } catch { /* لا شيء */ }
+  }
+  // 📲 عدّاد التحميلات: المتصفح يجلب المانيفست عند بدء التثبيت الفعلي (أو أول تثبيت PWA)
+  if (file === '/manifest.webmanifest') {
+    try {
+      if (!db.settings.stats) db.settings.stats = { visits: 0, installs: 0 };
+      db.settings.stats.installs++;
+      saveDb();
+    } catch { /* لا شيء */ }
+  }
   const full = path.normalize(path.join(PUBLIC_DIR, file));
   if (!full.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('Forbidden'); }
   fs.readFile(full, (err, data) => {
@@ -1156,6 +1174,11 @@ dbReady = loadDb().then(() => {
     else if (sh.category === 'مخبز ومعجنات') { sh.category = 'مخبز - معجنات - حلويات'; renamed++; }
   });
   if (renamed) { saveDb(); console.log('🏷️ حُدّث تصنيف ' + renamed + ' محل إلى «مخبز - معجنات - حلويات»'); }
+  // 📊 عدادات عامة: زوّار الصفحة الرئيسية + تحميلات التطبيق (تُرى من الإدارة فقط)
+  if (!db.settings.stats) db.settings.stats = { visits: 0, installs: 0 };
+  if (typeof db.settings.stats.visits !== 'number') db.settings.stats.visits = 0;
+  if (typeof db.settings.stats.installs !== 'number') db.settings.stats.installs = 0;
+
   // 🖼️ صورة محل سكاي كلين = نفس صورة إعلانه المنبثق (تُطبَّق تلقائياً مرة واحدة)
   let sk = 0;
   db.shops.forEach((sh) => {
