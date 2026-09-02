@@ -78,7 +78,7 @@ const CATEGORIES = [
   'مطعم',
   'لحوم ومجمدات',
   'خضار وفواكه',
-  'مخبز ومعجنات',
+  'مخبز - معجنات - حلويات',
   'موبايلات واكسسوارات وبطاقات شحن',
   'اجهزة كهربائية والكترونيات',
   'صيانة ومقاولات',
@@ -88,6 +88,9 @@ const CATEGORIES = [
   'تنك ماء',
   'ميكانيكي وكهربائي متنقل',
   'توصيل ركاب - طلاب - رحلات',
+  'بوتيك - ملابس - عطور - اكسسوارات',
+  'خياطة',
+  'عطارة',
   'أخرى',
 ];
 
@@ -96,10 +99,13 @@ const CATEGORY_ICONS = {
   'مطعم': '🍴',
   'لحوم ومجمدات': '🥩',
   'خضار وفواكه': '🥬',
-  'مخبز ومعجنات': '🥖',
+  'مخبز - معجنات - حلويات': '🥖',
   'تنك ماء': '🚛',
   'ميكانيكي وكهربائي متنقل': '🧰',
   'توصيل ركاب - طلاب - رحلات': '🚌',
+  'بوتيك - ملابس - عطور - اكسسوارات': '👗',
+  'خياطة': '🧵',
+  'عطارة': '🌿',
   'موبايلات واكسسوارات وبطاقات شحن': '📱',
   'اجهزة كهربائية والكترونيات': '💡',
   'صيانة ومقاولات': '🔧',
@@ -129,8 +135,11 @@ const CATEGORY_IMAGES = {
   'مطعم': '/img/shops/restaurant.jpg',
   'لحوم ومجمدات': '/img/shops/butcher.jpg',
   'خضار وفواكه': '/img/shops/vegetables.jpg',
-  'مخبز ومعجنات': '/img/shops/bakery.jpg',
+  'مخبز - معجنات - حلويات': '/img/shops/bakery.jpg',
   'تنك ماء': '/img/shops/watertank.jpg',
+  'بوتيك - ملابس - عطور - اكسسوارات': '/img/shops/boutique.jpg',
+  'خياطة': '/img/shops/tailor.jpg',
+  'عطارة': '/img/shops/herbs.jpg',
   'ميكانيكي وكهربائي متنقل': '/img/shops/mechanic.jpg',
   'توصيل ركاب - طلاب - رحلات': '/img/shops/passengers.jpg',
   'موبايلات واكسسوارات وبطاقات شحن': '/img/shops/mobile.jpg',
@@ -1139,8 +1148,20 @@ dbReady = loadDb().then(() => {
   }
   // 🏷️ ترقية التصنيفات: مخبز → مخبز ومعجنات (تُطبَّق على القاعدة المحفوظة تلقائياً)
   let renamed = 0;
-  db.shops.forEach((sh) => { if (sh.category === 'مخبز') { sh.category = 'مخبز ومعجنات'; renamed++; } });
-  if (renamed) { saveDb(); console.log('🏷️ حُدّث تصنيف ' + renamed + ' محل من «مخبز» إلى «مخبز ومعجنات»'); }
+  db.shops.forEach((sh) => {
+    if (sh.category === 'مخبز') { sh.category = 'مخبز - معجنات - حلويات'; renamed++; }
+    else if (sh.category === 'مخبز ومعجنات') { sh.category = 'مخبز - معجنات - حلويات'; renamed++; }
+  });
+  if (renamed) { saveDb(); console.log('🏷️ حُدّث تصنيف ' + renamed + ' محل إلى «مخبز - معجنات - حلويات»'); }
+  // 🖼️ صورة محل سكاي كلين = نفس صورة إعلانه المنبثق (تُطبَّق تلقائياً مرة واحدة)
+  let sk = 0;
+  db.shops.forEach((sh) => {
+    if (String(sh.name || '').includes('سكاي كلين') && sh.image !== '/img/ads/skyklean.jpg') {
+      sh.image = '/img/ads/skyklean.jpg';
+      sk++;
+    }
+  });
+  if (sk) { saveDb(); console.log('🖼️ حُدّثت صورة محل سكاي كلين لتطابق إعلانه المنبثق'); }
 });
 
 const server = http.createServer((req, res) => {
