@@ -853,3 +853,27 @@ input[type="file"]::file-selector-button {
 
 /* صورة الإعلان المنبثق داخل الورقة */
 .pbook-img { width: 100%; height: 150px; object-fit: cover; border-radius: 12px; margin: 4px 0 10px; box-shadow: 0 4px 14px rgba(63, 42, 10, .18); }
+
+/* ---------------- 🔍 البحث الشامل ---------------- */
+.search-wrap { position: relative; margin: 2px 0 12px; }
+.search-ic { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 17px; opacity: .85; pointer-events: none; }
+.search-input {
+  width: 100%; padding: 14px 46px 14px 44px; border-radius: 999px;
+  border: 2px solid var(--v3); background: #fff; font-family: inherit;
+  font-size: 14.5px; font-weight: 700; color: var(--ink);
+  box-shadow: 0 4px 18px rgba(109, 40, 217, .10); outline: none;
+  transition: border .2s, box-shadow .2s;
+}
+.search-input:focus { border-color: var(--v2); box-shadow: 0 6px 24px rgba(109, 40, 217, .24); }
+.search-input::placeholder {
+  color: var(--v2); font-weight: 700;
+  animation: phPulse 1.7s ease-in-out infinite;
+}
+@keyframes phPulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+#search-clear {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  width: 26px; height: 26px; border-radius: 50%; border: none;
+  background: var(--v3); color: var(--v1); font-weight: 800; cursor: pointer; line-height: 1;
+}
+.sres-item { display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 8px; }
+.sres-item:active { transform: scale(.99); }

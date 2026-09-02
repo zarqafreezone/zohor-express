@@ -51,15 +51,50 @@ function renderLogin() {
 async function doLogin() {
   const name = el('in-name').value.trim();
   const phone = el('in-phone').value.trim();
+  const password = el('in-pass') ? el('in-pass').value : '';
   if (name.length < 2) return toast('اكتب اسمك', 'bad');
   if (!/^07\d{8}$/.test(phone)) return toast('رقم الجوال يجب أن يبدأ بـ 07 (10 أرقام)', 'bad');
   try {
-    const d = await App.post('/drivers/login', { name, phone });
+    const d = await App.post('/drivers/login', { name, phone, password });
     driver = d.driver;
     App.save('driver', driver);
+    if (d.needsPassword) { renderSetPass(); return; }
     renderDash();
     toast('بالتوفيق يا ' + driver.name + ' 🛵', 'ok');
   } catch (e) { toast(e.message, 'bad'); }
+}
+
+/* 🔐 شاشة تأمين الحساب: تُلزم السائقين القدامى باختيار كلمة مرور */
+function renderSetPass() {
+  document.getElementById('view-dash').style.display = 'none';
+  document.getElementById('view-login').style.display = 'none';
+  const c = document.getElementById('view-complete');
+  if (c) c.style.display = 'none';
+  let w = document.getElementById('view-setpass');
+  if (!w) { w = document.createElement('div'); w.className = 'container'; w.id = 'view-setpass'; document.body.appendChild(w); }
+  w.style.display = '';
+  w.innerHTML = `
+    <div class="login-hero">
+      <div class="hero-brand"><img src="/img/brand/mark-256.png" alt="الزهور اكسبرس"><span class="badge">🔒</span></div>
+      <h2>أمّن حسابك يا ${escapeHtml(driver.name)}</h2>
+      <p>اختر كلمة مرور (4 خانات على الأقل) — تحمي طلباتك وأرباحك من أي أحد يعرف رقمك فقط</p>
+    </div>
+    <div class="card">
+      <div class="field"><label>كلمة المرور الجديدة</label><input class="input" id="sp-pass" type="password" placeholder="••••"></div>
+      <div class="field"><label>أعد كتابتها للتأكيد</label><input class="input" id="sp-pass2" type="password" placeholder="••••"></div>
+      <button class="btn ok block" id="btn-set-pass">💾 حفظ والدخول للوحة</button>
+    </div>`;
+  el('btn-set-pass').onclick = async () => {
+    const p1 = el('sp-pass').value, p2 = el('sp-pass2').value;
+    if (p1.length < 4) return toast('4 خانات على الأقل', 'bad');
+    if (p1 !== p2) return toast('الكلمتان غير متطابقتين', 'bad');
+    try {
+      await App.patch('/drivers/' + driver.id + '/password', { password: p1 });
+      w.style.display = 'none';
+      toast('حُمي حسابك بكلمة مرور ✅', 'ok');
+      renderDash();
+    } catch (e) { toast(e.message, 'bad'); }
+  };
 }
 
 /* ---------------- اللوحة ---------------- */
@@ -361,4 +396,4 @@ el('sw-online').onchange = async () => {
 // عند فتح الصفحة: إن كان متاحاً من قبل نكمل مشاركة الموقع
 if (driver && driver.online) startGeo();
 
-if (driver) renderDash(); else renderLogin();
+if (driver) { if (driver.needsPassword) renderSetPass(); else renderDash(); } else renderLogin();

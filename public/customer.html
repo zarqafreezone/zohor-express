@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="/img/icons/apple-180.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#4c1d95">
-  <link rel="stylesheet" href="/css/style.css?v=14">
+  <link rel="stylesheet" href="/css/style.css?v=15">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -69,6 +69,12 @@
 
   <!-- الرئيسية: المحلات -->
   <div class="container" id="view-home" style="display:none">
+    <div class="search-wrap">
+      <span class="search-ic">🔍</span>
+      <input id="global-search" class="search-input" type="search" placeholder="ابحث عن محل، منتج، خدمة في جبل الزهور" autocomplete="off">
+      <button id="search-clear" aria-label="مسح البحث" style="display:none">✕</button>
+    </div>
+    <div id="search-results" style="display:none"></div>
     <div id="ads-strip"></div>
     <div id="offers-section" style="display:none"></div>
     <div class="section-title">🏪 محلات المنطقة <span class="count" id="shops-count">0</span></div>
@@ -100,9 +106,9 @@
     </div>
   </nav>
 
-  <script src="/js/common.js?v=14"></script>
-  <script src="/js/sounds.js?v=14"></script>
-  <script src="/js/customer.js?v=14"></script>
+  <script src="/js/common.js?v=15"></script>
+  <script src="/js/sounds.js?v=15"></script>
+  <script src="/js/customer.js?v=15"></script>
   <script>
   // الإعلان المنبثق — يظهر أيضاً عند دخول الزبون مباشرة (مرة واحدة في الجلسة)
   (function () {

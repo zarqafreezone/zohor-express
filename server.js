@@ -44,6 +44,27 @@ async function pgPersist() {
 /* حفظ غير متزامن لا يكسر الطلبات — يضمن الاستمرارية مع السحابة */
 let _saving = false;
 let _dirtyAgain = false;
+let _pgFails = 0;
+let _retryTimer = null;
+
+/* 🗄️ نسخ احتياطية تلقائية — جدول app_backups في Neon (آخر 7 فقط) أو ملفات محلية */
+async function backupNow() {
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  if (pgPool) {
+    await pgPool.query('CREATE TABLE IF NOT EXISTS app_backups (id SERIAL PRIMARY KEY, ts TIMESTAMPTZ DEFAULT NOW(), data JSONB NOT NULL)');
+    await pgPool.query('INSERT INTO app_backups (data) VALUES ($1::jsonb)', [JSON.stringify(db)]);
+    await pgPool.query('DELETE FROM app_backups WHERE id NOT IN (SELECT id FROM app_backups ORDER BY ts DESC LIMIT 7)');
+    console.log('🗄️ نسخة احتياطية سحابية — آخر 7 محفوظة في Neon');
+  } else {
+    const bdir = path.join(DATA_DIR, 'backups');
+    fs.mkdirSync(bdir, { recursive: true });
+    fs.writeFileSync(path.join(bdir, 'backup-' + stamp + '.json'), JSON.stringify(db, null, 2), 'utf8');
+    const files = fs.readdirSync(bdir).sort();
+    while (files.length > 7) { try { fs.unlinkSync(path.join(bdir, files.shift())); } catch { break; } }
+    console.log('🗄️ نسخة احتياطية محلية — آخر 7 محفوظة');
+  }
+}
+
 function saveDb() {
   if (!pgPool) {
     try { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8'); } catch (e) { console.error('save file err:', e.message); }
@@ -58,10 +79,20 @@ function saveDb() {
     [snap]
   ).then(() => {
     _saving = false;
+    if (_pgFails) { console.log('✅ عاد الحفظ السحابي للعمل بعد ' + _pgFails + ' محاولة متعثرة — لا فقدان بيانات'); _pgFails = 0; }
     if (_dirtyAgain) { _dirtyAgain = false; saveDb(); }
   }).catch((e) => {
     _saving = false;
-    console.error('❌ فشل الحفظ السحابي:', e.message);
+    _pgFails++;
+    console.error('❌ فشل الحفظ السحابي (محاولة ' + _pgFails + '):', e.message);
+    // 🛡️ لا ضياع صامت: لقطة طوارئ على القرص + إعادة محاولة تلقائية كل 10 ثوانٍ
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(path.join(DATA_DIR, 'emergency-last.json'), snap, 'utf8');
+    } catch { /* تجاهل */ }
+    if (!_retryTimer) {
+      _retryTimer = setTimeout(() => { _retryTimer = null; if (_dirtyAgain || _pgFails) saveDb(); }, 10000);
+    }
   });
 }
 
@@ -155,6 +186,30 @@ const CATEGORY_IMAGES = {
 };
 
 /* تطبيع رقم الجوال: يقبل 07... أو +9627... أو 009627... أو 9627... */
+/* 🔐 كلمات المرور: تشفير scrypt — لا نص صريح في القاعدة إطلاقاً */
+function hashPassword(pw) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(pw), salt, 64).toString('hex');
+  return 'scrypt$' + salt + '$' + hash;
+}
+function checkPassword(pw, stored) {
+  if (!stored) return false;
+  if (String(stored).startsWith('scrypt$')) {
+    try {
+      const parts = String(stored).split('$');
+      const h = crypto.scryptSync(String(pw), parts[1], 64).toString('hex');
+      return crypto.timingSafeEqual(Buffer.from(h), Buffer.from(parts[2]));
+    } catch { return false; }
+  }
+  return String(pw) === String(stored); // نص صريح قديم — يُرقّى تلقائياً عند أول دخول ناجح
+}
+function upgradePassword(obj, field, pw) {
+  try { if (obj && obj[field] && !String(obj[field]).startsWith('scrypt$')) obj[field] = hashPassword(pw); } catch { /* تجاهل */ }
+}
+/* إخفاء الهاشات من أي استجابة API */
+function safeShop(x) { if (!x) return x; const c = { ...x }; delete c.password; return c; }
+function safeDriver(x) { if (!x) return x; const c = { ...x }; delete c.password; return c; }
+
 function normPhone(raw) {
   let p = String(raw || '').replace(/[^\d+]/g, '');
   if (p.startsWith('+962')) p = '0' + p.slice(4);
@@ -528,11 +583,46 @@ async function handleApi(req, res, pathname, url) {
     if (!db.settings.adminToken || req.headers['x-admin-token'] !== db.settings.adminToken) {
       return bad(res, 'غير مصرح — سجّل دخول الإدارة أولاً', 401);
     }
+    // 🕐 الجلسة تنتهي بعد 30 يوماً — لا سريان دائم لرمز مسروق
+    if (db.settings.adminTokenExpires && Date.now() > db.settings.adminTokenExpires) {
+      db.settings.adminToken = null;
+      saveDb();
+      return bad(res, 'انتهت صلاحية جلسة الإدارة — سجّل الدخول من جديد', 401);
+    }
   }
 
   /* ---------- عام ---------- */
   if (m === 'GET' && pathname === '/api/health') {
     return json(res, 200, { ok: true, app: 'zohor-express', area: db.settings.area });
+
+  } else if (m === 'GET' && pathname === '/api/search') {
+    // 🔍 بحث شامل: محلات + منتجات وخدمات — بتطبيع عربي (همزات/تاء مربوطة/تشكيل)
+    const normAr = (t) => String(t || '').toLowerCase()
+      .replace(/[\u064B-\u0652]/g, '')
+      .replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا')
+      .replaceAll('ة', 'ه').replaceAll('ى', 'ي');
+    const qn = normAr(q('q')).trim();
+    if (qn.length < 2) return json(res, 200, { shops: [], items: [] });
+    const liveShops = db.shops.filter((x) => x.status === 'active' && subActive(x));
+    const shops = liveShops
+      .filter((x) => normAr(x.name).includes(qn) || normAr(x.category).includes(qn))
+      .slice(0, 8)
+      .map(publicShop);
+    const items = [];
+    liveShops.forEach((x) => {
+      (x.products || []).forEach((p) => {
+        if (normAr(p.name).includes(qn)) {
+          items.push({
+            productId: p.id, shopId: x.id, shopName: x.name, shopIcon: x.icon,
+            name: p.name, emoji: p.emoji, price: p.price, oldPrice: p.oldPrice || null,
+            unit: p.unit, kind: p.kind || 'product', available: !!p.available,
+            discount: p.oldPrice && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0,
+          });
+        }
+      });
+    });
+    items.sort((a, b) => (b.available - a.available) || (b.discount - a.discount));
+    return json(res, 200, { shops, items: items.slice(0, 14) });
 
   } else if (m === 'GET' && pathname === '/api/popup') {
     // رابط المحل في المنبثق يظهر فقط إن كان المحل حياً وفعّالاً (كما في شريط الإعلانات)
@@ -631,7 +721,7 @@ async function handleApi(req, res, pathname, url) {
     };
     db.shops.push(shop);
     saveDb();
-    return json(res, 200, { shop });
+    return json(res, 200, { shop: safeShop(shop) });
 
   } else if (m === 'POST' && pathname === '/api/shops/login') {
     const shop = findShop(body.shopId);
@@ -639,8 +729,10 @@ async function handleApi(req, res, pathname, url) {
     if (shop.status === 'blocked') return bad(res, 'تم إيقاف هذا المحل. تواصل مع الإدارة', 403);
     const pass = String(body.password || '');
     if (!pass) return bad(res, 'أدخل الرقم السري للمحل');
-    if (pass !== (shop.password || SEED_SHOP_PASSWORD)) return bad(res, 'الرقم السري غير صحيح', 401);
-    return json(res, 200, { shop });
+    if (!checkPassword(pass, shop.password)) return bad(res, 'الرقم السري غير صحيح', 401);
+    upgradePassword(shop, 'password', pass);
+    saveDb();
+    return json(res, 200, { shop: safeShop(shop) });
 
   } else if (m === 'PATCH' && parts[1] === 'shops' && parts[2] && parts[3] === 'password') {
     // تغيير الرقم السري
@@ -648,9 +740,9 @@ async function handleApi(req, res, pathname, url) {
     if (!shop) return bad(res, 'المحل غير موجود', 404);
     const oldPass = String(body.oldPassword || '');
     const newPass = String(body.newPassword || '');
-    if (oldPass !== (shop.password || SEED_SHOP_PASSWORD)) return bad(res, 'الرقم السري الحالي غير صحيح', 401);
+    if (!checkPassword(oldPass, shop.password)) return bad(res, 'الرقم السري الحالي غير صحيح', 401);
     if (newPass.length < 4) return bad(res, 'الرقم السري الجديد يجب أن يكون 4 خانات على الأقل');
-    shop.password = newPass;
+    shop.password = hashPassword(newPass);
     saveDb();
     return json(res, 200, { ok: true });
 
@@ -658,12 +750,12 @@ async function handleApi(req, res, pathname, url) {
     const shop = findShop(parts[2]);
     // 🔒 صفحة المحل للزبائن: المحلات غير الفعّالة (موقوفة/اشتراك منتهي) لا تظهر إطلاقاً
     if (!shop || shop.status !== 'active' || !subActive(shop)) return bad(res, 'المحل غير متاح حالياً', 404);
-    if (m === 'GET') return json(res, 200, { shop });
+    if (m === 'GET') return json(res, 200, { shop: safeShop(shop) });
     if (m === 'PATCH') {
       if (typeof body.isOpen === 'boolean') shop.isOpen = body.isOpen;
       if (body.name) shop.name = body.name;
       saveDb();
-      return json(res, 200, { shop });
+      return json(res, 200, { shop: safeShop(shop) });
     }
 
   } else if (parts[1] === 'shops' && parts[2] && parts[3] === 'products' && !parts[4]) {
@@ -684,7 +776,7 @@ async function handleApi(req, res, pathname, url) {
       };
       shop.products.push(product);
       saveDb();
-      return json(res, 200, { product, shop });
+      return json(res, 200, { product, shop: safeShop(shop) });
     }
 
   } else if (parts[1] === 'shops' && parts[2] && parts[3] === 'products' && parts[4]) {
@@ -709,12 +801,12 @@ async function handleApi(req, res, pathname, url) {
       if (body.oldPrice === null) delete product.oldPrice;
       else if (body.oldPrice != null && !isNaN(+body.oldPrice) && +body.oldPrice > 0) product.oldPrice = round2(+body.oldPrice);
       saveDb();
-      return json(res, 200, { product, shop });
+      return json(res, 200, { product, shop: safeShop(shop) });
     }
     if (m === 'DELETE') {
       shop.products = shop.products.filter((p) => p.id !== product.id);
       saveDb();
-      return json(res, 200, { ok: true, shop });
+      return json(res, 200, { ok: true, shop: safeShop(shop) });
     }
 
   /* ---------- الطلبات ---------- */
@@ -811,6 +903,7 @@ async function handleApi(req, res, pathname, url) {
       const out = { order };
       if (order.driverId) {
         const drv = findDriver(order.driverId);
+        if (drv) out.driverPhone = drv.phone; // 📞 الزبون يتصل بالسائق مباشرة
         if (drv && drv.location && Date.now() - drv.location.updatedAt < 15 * 60000) {
           out.driverLocation = drv.location;
         }
@@ -856,20 +949,44 @@ async function handleApi(req, res, pathname, url) {
 
   /* ---------- السائقون ---------- */
   } else if (m === 'POST' && pathname === '/api/drivers/login') {
-    const { name, phone } = body;
+    const { name, phone, password } = body;
     const norm = normPhone(phone);
     if (!validPhone(norm)) return bad(res, 'رقم الجوال غير صحيح — مثال صحيح: 0791234567');
     let d = db.drivers.find((x) => x.phone === norm);
     if (!d) {
+      // سائق جديد: كلمة المرور إلزامية — تحمي طلباته وأرباحه
+      if (!password || String(password).length < 4) {
+        return bad(res, 'اختر كلمة مرور لحسابك (4 خانات على الأقل) — تحمي طلباتك وأرباحك');
+      }
       d = { id: nextId('d'), name: name || 'سائق', phone: norm, status: 'pending',
         docsSubmitted: false, idImage: null, licenseImage: null,
-        phone2: '', address: '', online: false, deliveries: 0, earnings: 0, createdAt: Date.now() };
+        phone2: '', address: '', online: false, deliveries: 0, earnings: 0,
+        password: hashPassword(password), createdAt: Date.now() };
       db.drivers.push(d);
-    } else if (name) {
-      d.name = name;
+    } else {
+      if (d.password) {
+        // حساب محمي: كلمة المرور إلزامية
+        if (!checkPassword(password, d.password)) return bad(res, 'كلمة المرور غير صحيحة لهذا الرقم', 401);
+        if (name) d.name = name;
+      } else {
+        // سائق قديم (قبل التأمين): يدخل ويُلزم باختيار كلمة مرور من لوحته
+        // وإن أرسل كلمة مرور الآن اعتُمدت فوراً
+        if (password && String(password).length >= 4) d.password = hashPassword(password);
+        else if (name) d.name = name;
+      }
     }
     saveDb();
-    return json(res, 200, { driver: d });
+    return json(res, 200, { driver: safeDriver(d), needsPassword: !d.password });
+
+  } else if (m === 'PATCH' && parts[1] === 'drivers' && parts[2] && parts[3] === 'password') {
+    // 🔐 السائق يختار/يغيّر كلمة مروره
+    const driver = findDriver(parts[2]);
+    if (!driver) return bad(res, 'السائق غير موجود', 404);
+    const pw = String(body.password || '');
+    if (pw.length < 4) return bad(res, 'كلمة المرور يجب أن تكون 4 خانات على الأقل');
+    driver.password = hashPassword(pw);
+    saveDb();
+    return json(res, 200, { ok: true });
 
   } else if (m === 'PATCH' && parts[1] === 'drivers' && parts[2] && parts[3] === 'location') {
     // تحديث موقع السائق المباشر (GPS)
@@ -900,27 +1017,40 @@ async function handleApi(req, res, pathname, url) {
     if (body.address !== undefined) driver.address = String(body.address).slice(0, 200);
     driver.docsSubmitted = !!(driver.idImage && driver.licenseImage);
     saveDb();
-    return json(res, 200, { driver });
+    return json(res, 200, { driver: safeDriver(driver) });
 
   } else if (parts[1] === 'drivers' && parts[2] && !parts[3]) {
     const driver = findDriver(parts[2]);
     if (!driver) return bad(res, 'السائق غير موجود', 404);
-    if (m === 'GET') return json(res, 200, { driver });
+    if (m === 'GET') return json(res, 200, { driver: safeDriver(driver) });
     if (m === 'PATCH') {
       if (body.online === true && driver.status !== 'active') {
         return bad(res, 'حسابك بانتظار اعتماد الإدارة — لا يمكن التفعيل الآن', 403);
       }
       if (typeof body.online === 'boolean') driver.online = body.online;
       saveDb();
-      return json(res, 200, { driver });
+      return json(res, 200, { driver: safeDriver(driver) });
     }
 
   /* ---------- الإدارة ---------- */
   } else if (m === 'POST' && pathname === '/api/admin/login') {
-    if (body.password !== db.settings.adminPassword) return bad(res, 'كلمة المرور غير صحيحة', 401);
-    // رمز جلسة ثابت: يتولد مرة واحدة فقط ولا يُبطل جلسات أخرى
-    // (نفس الإدارة قد تكون مسجلة من الكمبيوتر والموبايل معاً)
+    // 🛡️ حماية من التخمين: قفل 10 دقائق بعد 5 محاولات خاطئة
+    const fl = db.settings.adminFails || (db.settings.adminFails = { n: 0, until: 0 });
+    const nowMs = Date.now();
+    if (fl.until > nowMs) {
+      return bad(res, 'محاولات خاطئة كثيرة — الدخول مقفل، حاول بعد ' + Math.ceil((fl.until - nowMs) / 60000) + ' دقيقة', 429);
+    }
+    if (!checkPassword(body.password, db.settings.adminPassword)) {
+      fl.n++;
+      if (fl.n >= 5) { fl.n = 0; fl.until = nowMs + 10 * 60000; saveDb(); return bad(res, '5 محاولات خاطئة — أُقفل الدخول مؤقتاً 10 دقائق', 429); }
+      saveDb();
+      return bad(res, 'كلمة المرور غير صحيحة', 401);
+    }
+    fl.n = 0; fl.until = 0;
+    upgradePassword(db.settings, 'adminPassword', body.password);
+    // رمز موحّد للإدارة (كمبيوتر + موبايل معاً) بصلاحية 30 يوماً
     if (!db.settings.adminToken) db.settings.adminToken = crypto.randomBytes(24).toString('hex');
+    db.settings.adminTokenExpires = Date.now() + 30 * 86400000;
     saveDb();
     return json(res, 200, { ok: true, token: db.settings.adminToken });
 
@@ -965,7 +1095,7 @@ async function handleApi(req, res, pathname, url) {
         if (shop.status === 'pending') shop.status = 'active';
       }
       saveDb();
-      return json(res, 200, { shop });
+      return json(res, 200, { shop: safeShop(shop) });
     }
     if (m === 'DELETE') {
       // حذف المحل نهائياً مع منتجاته — سجل طلباته القديمة يبقى محفوظاً (الأسماء منسوخة فيه)
@@ -976,7 +1106,7 @@ async function handleApi(req, res, pathname, url) {
     }
 
   } else if (m === 'GET' && pathname === '/api/admin/drivers') {
-    return json(res, 200, { drivers: db.drivers });
+    return json(res, 200, { drivers: db.drivers.map(safeDriver) });
 
   } else if (parts[1] === 'admin' && parts[2] === 'drivers' && parts[3]) {
     const driver = findDriver(parts[3]);
@@ -987,7 +1117,7 @@ async function handleApi(req, res, pathname, url) {
         if (body.status === 'blocked') driver.online = false;
       }
       saveDb();
-      return json(res, 200, { driver });
+      return json(res, 200, { driver: safeDriver(driver) });
     }
     if (m === 'DELETE') {
       // حذف السائق نهائياً — طلباته النشطة تعود لتجمّع الانتظار ليتولاها سائقون آخرون
@@ -1188,6 +1318,27 @@ dbReady = loadDb().then(() => {
     }
   });
   if (sk) { saveDb(); console.log('🖼️ حُدّثت صورة محل سكاي كلين لتطابق إعلانه المنبثق'); }
+  // 🔐 ترقية أمنية: تشفير كل كلمات المرور المخزّنة نصاً صريحاً (مرة واحدة)
+  let hashed = 0;
+  if (db.settings.adminPassword && !String(db.settings.adminPassword).startsWith('scrypt$')) {
+    db.settings.adminPassword = hashPassword(db.settings.adminPassword);
+    hashed++;
+  }
+  db.shops.forEach((sh) => {
+    const p = sh.password || SEED_SHOP_PASSWORD;
+    if (!String(p).startsWith('scrypt$')) { sh.password = hashPassword(p); hashed++; }
+  });
+  db.drivers.forEach((dr) => {
+    if (dr.password && !String(dr.password).startsWith('scrypt$')) { dr.password = hashPassword(dr.password); hashed++; }
+  });
+  if (hashed) { saveDb(); console.log('🔐 رُقّيت ' + hashed + ' كلمة مرور إلى تشفير scrypt آمن'); }
+  // 📊 تهيئة عدادات الزوار والتحميلات
+  if (!db.settings.stats) db.settings.stats = { visits: 0, installs: 0 };
+  if (typeof db.settings.stats.visits !== 'number') db.settings.stats.visits = 0;
+  if (typeof db.settings.stats.installs !== 'number') db.settings.stats.installs = 0;
+  // 🗄️ أول نسخة احتياطية بعد الإقلاع + نسخة يومية تلقائية
+  backupNow().catch((e) => console.error('⚠️ تعذرت النسخة الاحتياطية:', e.message));
+  setInterval(() => backupNow().catch((e) => console.error('⚠️ تعذرت النسخة الاحتياطية:', e.message)), 24 * 3600000);
 });
 
 const server = http.createServer((req, res) => {

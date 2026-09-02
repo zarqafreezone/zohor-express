@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="/img/icons/apple-180.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#4c1d95">
-  <link rel="stylesheet" href="/css/style.css?v=14">
+  <link rel="stylesheet" href="/css/style.css?v=15">
 </head>
 <body>
   <header class="app-header">
@@ -39,8 +39,12 @@
         <label>رقم الجوال</label>
         <input class="input" id="in-phone" type="tel" inputmode="numeric" placeholder="07xxxxxxxx" maxlength="10">
       </div>
+      <div class="field">
+        <label>🔒 كلمة المرور</label>
+        <input class="input" id="in-pass" type="password" placeholder="•••• (جديد؟ اختر واحدة الآن)">
+      </div>
       <button class="btn block" id="btn-login">دخول 🚀</button>
-      <p class="muted small" style="margin-top:8px">إن كان رقمك مسجلاً سندخلك على حسابك، وإلا سننشئ لك حساباً جديداً</p>
+      <p class="muted small" style="margin-top:8px">كلمة المرور تحمي طلباتك وأرباحك — إن كان حسابك قديماً بدون كلمة مرور سيطلب منك اختيار واحدة بعد الدخول</p>
     </div>
   </div>
 
@@ -75,8 +79,8 @@
     <div id="history"></div>
   </div>
 
-  <script src="/js/common.js?v=14"></script>
-  <script src="/js/sounds.js?v=14"></script>
-  <script src="/js/driver.js?v=14"></script>
+  <script src="/js/common.js?v=15"></script>
+  <script src="/js/sounds.js?v=15"></script>
+  <script src="/js/driver.js?v=15"></script>
 </body>
 </html>

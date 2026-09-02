@@ -447,6 +447,61 @@ function maybeOpenPendingShop() {
   return false;
 }
 
+/* ---------------- 🔍 البحث الشامل ---------------- */
+
+let searchTimer = null;
+function initSearch() {
+  const inp = document.getElementById('global-search');
+  if (!inp || inp.dataset.bound) return;
+  inp.dataset.bound = '1';
+  const res = document.getElementById('search-results');
+  const clearBtn = document.getElementById('search-clear');
+  const restore = () => {
+    res.style.display = 'none'; res.innerHTML = '';
+    document.getElementById('shops-grid').style.display = '';
+    const cats = document.getElementById('cat-tabs'); if (cats) cats.style.display = '';
+    const off = document.getElementById('offers-section');
+    if (off) off.style.display = off.innerHTML ? '' : 'none';
+  };
+  inp.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const qv = inp.value.trim();
+    clearBtn.style.display = qv ? '' : 'none';
+    if (qv.length < 2) return restore();
+    searchTimer = setTimeout(async () => {
+      try {
+        const d = await App.get('/search?q=' + encodeURIComponent(qv));
+        document.getElementById('shops-grid').style.display = 'none';
+        const cats = document.getElementById('cat-tabs'); if (cats) cats.style.display = 'none';
+        const off = document.getElementById('offers-section'); if (off) off.style.display = 'none';
+        res.style.display = '';
+        const shopCards = d.shops.map((x) => `
+          <div class="list-link" onclick="openShop('${x.id}')">
+            <div class="icon">${x.image ? `<img src="${x.image}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : x.icon}</div>
+            <div class="flex1"><h4>${escapeHtml(x.name)}</h4><div class="sub">${escapeHtml(x.category)} • ${x.productCount} منتج وخدمة</div></div>
+            <span class="muted">دخول ←</span>
+          </div>`).join('');
+        const itemCards = d.items.map((it) => `
+          <div class="card sres-item" onclick="openShop('${it.shopId}')">
+            <div class="p-emoji">${it.emoji}</div>
+            <div class="flex1">
+              <div class="p-name">${escapeHtml(it.name)} ${it.kind === 'service' ? '<span class="chip info">🛠️ خدمة</span>' : ''} ${it.discount ? `<span class="chip warn">🔥 -${it.discount}%</span>` : ''} ${it.available ? '' : '<span class="chip gray">غير متوفر</span>'}</div>
+              <div class="sub">${it.shopIcon} ${escapeHtml(it.shopName)} • ${it.kind === 'service' ? 'يُطلب كخدمة' : escapeHtml(it.unit)}</div>
+            </div>
+            <div class="p-price">${it.oldPrice ? `<span style="display:block;font-size:11px;color:var(--mut);text-decoration:line-through">${App.fmt(it.oldPrice)}</span>` : ''}${App.fmt(it.price)}</div>
+          </div>`).join('');
+        res.innerHTML = `
+          <button class="btn ghost sm" id="btn-clear-search" style="margin-bottom:8px">← رجوع لكل المحلات</button>
+          ${d.shops.length ? `<div class="section-title">🏪 محلات (${d.shops.length})</div>${shopCards}` : ''}
+          ${d.items.length ? `<div class="section-title">🛒 منتجات وخدمات (${d.items.length})</div>${itemCards}` : ''}
+          ${!d.shops.length && !d.items.length ? '<div class="empty"><div class="e-icon">🔍</div><div class="e-title">لا نتائج مطابقة — جرّب كلمة أقصر</div></div>' : ''}`;
+        document.getElementById('btn-clear-search').onclick = () => { inp.value = ''; inp.dispatchEvent(new Event('input')); inp.focus(); };
+      } catch { /* تجاهل */ }
+    }, 260);
+  });
+  clearBtn.onclick = () => { inp.value = ''; inp.dispatchEvent(new Event('input')); inp.focus(); };
+}
+
 /* ---------------- طلباتي (مع تبويبات وإعادة طلب) ---------------- */
 
 let ordersTab = 'active'; // active | past
@@ -603,7 +658,7 @@ async function renderTrack() {
           <h3>${o.shopIcon} ${escapeHtml(o.shopName)}</h3>
           ${chip(o.status)}
         </div>
-        ${o.driverName ? `<div class="muted small" style="margin-bottom:4px">🛵 السائق: <b>${escapeHtml(o.driverName)}</b></div>` : ''}
+        ${o.driverName ? `<div class="muted small" style="margin-bottom:4px">🛵 السائق: <b>${escapeHtml(o.driverName)}</b> ${d.driverPhone ? `<a class="chip info" dir="ltr" href="tel:${d.driverPhone}" style="text-decoration:none; margin-inline-start:6px">📞 اتصل بالسائق</a>` : ''}</div>` : ''}
         <div class="muted small">📍 ${escapeHtml(o.address)}</div>
         ${o.notes ? `<div class="muted small">📝 ${escapeHtml(o.notes)}</div>` : ''}
       </div>
@@ -759,6 +814,7 @@ document.querySelectorAll('#nav a').forEach((a) => {
   });
 });
 
+initSearch(); // 🔍 البحث الشامل يعمل دائماً
 if (me) {
   renderHome();
   refreshBubble();
