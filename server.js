@@ -126,6 +126,7 @@ const CATEGORIES = [
   'عطارة',
   'غاز - اسطوانات',
   'محمص',
+  'مكتبة وقرطاسية',
   'أخرى',
 ];
 
@@ -145,6 +146,7 @@ const CATEGORY_ICONS = {
   'عطارة': '🌿',
   'غاز - اسطوانات': '🔥',
   'محمص': '🥜',
+  'مكتبة وقرطاسية': '📚',
   'موبايلات واكسسوارات وبطاقات شحن': '📱',
   'اجهزة كهربائية والكترونيات': '💡',
   'صيانة ومقاولات': '🔧',
@@ -182,6 +184,8 @@ const CATEGORY_IMAGES = {
   'خياطة': '/img/shops/tailor.jpg',
   'عطارة': '/img/shops/herbs.jpg',
   'غاز - اسطوانات': '/img/shops/gas.jpg',
+  'محمص': '/img/shops/roastery.jpg',
+  'مكتبة وقرطاسية': '/img/shops/stationery.jpg',
   'ميكانيكي وكهربائي متنقل': '/img/shops/mechanic.jpg',
   'توصيل ركاب - طلاب - رحلات': '/img/shops/passengers.jpg',
   'موبايلات واكسسوارات وبطاقات شحن': '/img/shops/mobile.jpg',

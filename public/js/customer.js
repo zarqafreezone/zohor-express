@@ -8,7 +8,7 @@ const CAT_IMG = {
   'لحوم ومجمدات': '/img/shops/butcher.jpg', 'خضار وفواكه': '/img/shops/vegetables.jpg',
   'مخبز - معجنات - حلويات': '/img/shops/bakery.jpg', 'تنك ماء': '/img/shops/watertank.jpg',
   'بوتيك وملابس': '/img/shops/boutique.jpg', 'الأحذية': '/img/shops/shoes.jpg', 'عطور واكسسوارات': '/img/shops/perfumes.jpg', 'خياطة': '/img/shops/tailor.jpg', 'عطارة': '/img/shops/herbs.jpg',
-  'غاز - اسطوانات': '/img/shops/gas.jpg', 'محمص': '/img/shops/roastery.jpg',
+  'غاز - اسطوانات': '/img/shops/gas.jpg', 'محمص': '/img/shops/roastery.jpg', 'مكتبة وقرطاسية': '/img/shops/stationery.jpg',
   'ميكانيكي وكهربائي متنقل': '/img/shops/mechanic.jpg', 'توصيل ركاب - طلاب - رحلات': '/img/shops/passengers.jpg', 'موبايلات واكسسوارات وبطاقات شحن': '/img/shops/mobile.jpg',
   'اجهزة كهربائية والكترونيات': '/img/shops/electronics.jpg', 'صيانة ومقاولات': '/img/shops/maintenance.jpg',
   'دراي كلين': '/img/shops/dryclean.jpg', 'مياه شرب': '/img/shops/water.jpg',
